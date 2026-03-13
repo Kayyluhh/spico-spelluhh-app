@@ -712,6 +712,7 @@ body{background:#bb3321;color:#fff;font-family:'Nunito',sans-serif;font-size:14p
   var transport = null;   // {type:'ble'|'usb', send:fn(bytes), close:fn()}
   var bleDevice = null;
   var midiAccess = null;
+  var usbPollTimer = null;
 
   function bleTimestamp() {
     var t = Date.now() & 0x1FFF;
@@ -725,6 +726,21 @@ body{background:#bb3321;color:#fff;font-family:'Nunito',sans-serif;font-size:14p
         var buf = new Uint8Array(2 + bytes.length);
         buf[0] = ts[0]; buf[1] = ts[1];
         buf.set(bytes, 2);
+        characteristic.writeValueWithoutResponse(buf).catch(function(){});
+      },
+      sendMulti: function(msgs) {
+        // Pack multiple MIDI messages into one BLE MIDI packet (atomic delivery)
+        // Format: [ts_hi, ts_lo, msg1..., ts_lo, msg2..., ts_lo, msg3...]
+        var ts = bleTimestamp();
+        var len = 2; // ts_hi + ts_lo for first message
+        for (var i = 0; i < msgs.length; i++) len += (i > 0 ? 1 : 0) + msgs[i].length;
+        var buf = new Uint8Array(len);
+        var pos = 0;
+        buf[pos++] = ts[0]; buf[pos++] = ts[1];
+        for (var i = 0; i < msgs.length; i++) {
+          if (i > 0) buf[pos++] = ts[1]; // timestamp low byte before each subsequent message
+          for (var j = 0; j < msgs[i].length; j++) buf[pos++] = msgs[i][j];
+        }
         characteristic.writeValueWithoutResponse(buf).catch(function(){});
       },
       close: function() {
@@ -742,19 +758,16 @@ body{background:#bb3321;color:#fff;font-family:'Nunito',sans-serif;font-size:14p
   }
   function sendSeqStep(bank, step, val) {
     if (!transport) return;
-    if (transport.type === 'ble') {
-      // BLE needs delay between writes to avoid dropped packets
-      transport.send(new Uint8Array([0xB0, 23, (bank * 32) & 0x7F]));
-      setTimeout(function() {
-        transport.send(new Uint8Array([0xB0, 24, step & 0x7F]));
-        setTimeout(function() {
-          transport.send(new Uint8Array([0xB0, 25, val & 0x7F]));
-        }, 30);
-      }, 30);
+    var msgs = [
+      [0xB0, 23, (bank * 32) & 0x7F],
+      [0xB0, 24, step & 0x7F],
+      [0xB0, 25, val & 0x7F]
+    ];
+    if (transport.type === 'ble' && transport.sendMulti) {
+      // Atomic BLE packet — all 3 CCs arrive in one write, no race condition
+      transport.sendMulti(msgs);
     } else {
-      transport.send(new Uint8Array([0xB0, 23, (bank * 32) & 0x7F]));
-      transport.send(new Uint8Array([0xB0, 24, step & 0x7F]));
-      transport.send(new Uint8Array([0xB0, 25, val & 0x7F]));
+      for (var i = 0; i < msgs.length; i++) transport.send(new Uint8Array(msgs[i]));
     }
   }
   function sendSysex(bytes) {
@@ -767,15 +780,18 @@ body{background:#bb3321;color:#fff;font-family:'Nunito',sans-serif;font-size:14p
   }
 
   // ---- USB MIDI (WebMIDI) transport ----
+  var usbSysexBuf = [], usbInSysex = false;
   function handleUsbMidiMessage(event) {
     var data = event.data;
-    if (!data || data.length < 2) return;
-    console.log('[USB-RX] len=' + data.length + ' first=' + data[0].toString(16) + ' last=' + data[data.length-1].toString(16));
-    if (data[0] === 0xF0) {
-      var inner = [];
-      for (var i = 1; i < data.length - 1; i++) inner.push(data[i]);
-      console.log('[USB-RX] SysEx inner len=' + inner.length + (inner.length >= 5 ? ' d3=0x' + inner[3].toString(16) + ' d4=0x' + inner[4].toString(16) : ''));
-      if (inner.length >= 5) decodeSysexState(inner);
+    if (!data || data.length < 1) return;
+    // Process each byte — handles both complete and fragmented SysEx
+    for (var i = 0; i < data.length; i++) {
+      var b = data[i];
+      if (b === 0xF0) { usbInSysex = true; usbSysexBuf = []; }
+      else if (b === 0xF7) {
+        if (usbInSysex && usbSysexBuf.length >= 5) decodeSysexState(usbSysexBuf);
+        usbInSysex = false; usbSysexBuf = [];
+      } else if (usbInSysex) { usbSysexBuf.push(b); }
     }
   }
   function createUsbTransport(midiOutput, midiInput) {
@@ -815,6 +831,8 @@ body{background:#bb3321;color:#fff;font-family:'Nunito',sans-serif;font-size:14p
           }
         };
         requestState();
+        // Poll for state updates — USB SysEx from firmware can be silently dropped
+        usbPollTimer = setInterval(requestState, 200);
       });
     }).catch(function(err) {
       $('conn-label').textContent = err.message.indexOf('denied') >= 0
@@ -1163,6 +1181,7 @@ body{background:#bb3321;color:#fff;font-family:'Nunito',sans-serif;font-size:14p
   $('pick-usb').addEventListener('click', function(){ hidePicker(); connectUsb(); });
 
   function onDisconnect(){
+    if (usbPollTimer) { clearInterval(usbPollTimer); usbPollTimer = null; }
     connected = false; transport = null;
     bleDevice = null; midiAccess = null;
     sysexBuf = []; inSysex = false;
