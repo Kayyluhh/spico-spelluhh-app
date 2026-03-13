@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Spico">
+<meta name="theme-color" content="#eba02f">
+<link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<link rel="manifest" href="./manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800&display=swap" rel="stylesheet">
+<title>Spico &amp; Spelluhh</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#bb3321;color:#fff;font-family:'Nunito',sans-serif;font-size:14px;
+  -webkit-user-select:none;user-select:none;touch-action:manipulation}
+.wrap{max-width:480px;margin:0 auto;padding:4px}
+.logo-wrap{text-align:center;padding:6px 8px 4px;background:#e8b820;border-radius:8px;margin-bottom:4px}
+.logo-wrap img{max-height:72px;max-width:88%}
+/* Cards — layered borders matching hardware: red case → yellow → blue */
+.card{background:#4d8fc2;border:3px solid #e8b820;box-shadow:0 0 0 3px #bb3321;
+  border-radius:8px;padding:10px;margin-bottom:8px}
+.card h2{font-size:0.85em;color:#1a1a1a;margin-bottom:8px;text-transform:uppercase;
+  letter-spacing:1px;font-weight:800;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.sec-div{height:1px;background:#3a7aaa;margin:8px 0}
+
+/* Knobs — SVG encoder with arc progress */
+.knobs-row{display:flex;justify-content:space-around;align-items:flex-start;padding:2px 0 4px}
+.knob-wrap{display:flex;flex-direction:column;align-items:center;gap:2px;-webkit-user-select:none}
+.knob{touch-action:none;cursor:ns-resize;-webkit-user-select:none;
+  -webkit-tap-highlight-color:transparent;overflow:visible;display:block}
+.knob-body{fill:#eba02f;stroke:#c07a10;stroke-width:2}
+.knob.active .knob-body{fill:#c07a10;stroke:#994d00}
+.knob-track{fill:none;stroke:#1a1a1a;stroke-width:5;stroke-linecap:round;opacity:0.2}
+.knob-prog{fill:none;stroke:#cc2200;stroke-width:5;stroke-linecap:round;stroke-dasharray:0 104}
+.knob-ptr{stroke:#1a1a1a;stroke-width:3;stroke-linecap:round}
+.knob.active .knob-ptr{stroke:#ffffffcc}
+.knob-val{font-size:0.78em;color:#1a1a1a;font-weight:800;text-align:center;
+  min-width:58px;line-height:1.3}
+.knob-label{font-size:0.65em;color:#1a1a1a;font-weight:700;text-align:center;
+  letter-spacing:0.5px;text-transform:uppercase}
+/* Glitch switches */
+.glitch-row{display:grid;gap:4px}
+.glitch-8{grid-template-columns:repeat(8,1fr)}
+.glitch-4{grid-template-columns:repeat(4,1fr);margin-top:4px}
+.gl{font-size:0.78em;text-align:center;padding:10px 0;border-radius:4px;background:#eba02f;
+  border:1px solid #c07a10;color:#1a1a1a;cursor:pointer;font-weight:700;
+  -webkit-tap-highlight-color:transparent;transition:transform .06s}
+.gl.pressing{transform:scale(0.93)}
+.gl.on{background:#00cc66;border-color:#007a3a;color:#fff}
+.gl.fb{background:#eba02f;border-color:#994400}
+.gl.fb.on{background:#ff8800;border-color:#994400;color:#fff}
+.gl.sk{background:#eba02f;border-color:#880000}
+.gl.sk.on{background:#cc2200;border-color:#880000;color:#fff}
+
+/* LFO */
+.lfo-row{display:flex;gap:6px;align-items:center;margin-bottom:6px}
+.lfo-row .l{color:#1a1a1a;flex:0 0 48px;font-size:0.78em;font-weight:700}
+.lfo-sel{display:flex;gap:3px;flex:1}
+.lfo-sel button{flex:1;font-size:0.72em;padding:8px 2px;background:#eba02f;
+  border:1px solid #c07a10;color:#1a1a1a;border-radius:4px;cursor:pointer;
+  font-family:inherit;font-weight:700;-webkit-tap-highlight-color:transparent}
+.lfo-sel button.active{background:#1a1a1a;border-color:#eba02f;color:#eba02f}
+.lfo-sel button.pressing{background:#c07a10;color:#fff}
+.lfo-knobs{display:flex;justify-content:space-around;margin-top:4px}
+
+/* Sequencer */
+.seq-ctrl{display:flex;gap:8px;align-items:center;margin-bottom:8px;
+  justify-content:space-between}
+.seq-ctrl button{font-size:0.88em;padding:10px 14px;background:#eba02f;
+  border:1px solid #c07a10;color:#1a1a1a;border-radius:4px;cursor:pointer;
+  font-family:inherit;font-weight:700;-webkit-tap-highlight-color:transparent}
+.seq-ctrl button.active{background:#1a1a1a;border-color:#eba02f;color:#eba02f}
+.seq-ctrl button.pressing{background:#c07a10;color:#fff}
+.seq-mode-btn{font-size:0.82em;padding:10px 10px;background:#eba02f;
+  border:1px solid #c07a10;color:#1a1a1a;border-radius:4px;cursor:pointer;
+  font-family:inherit;min-width:72px;font-weight:700;
+  -webkit-tap-highlight-color:transparent}
+.seq-mode-btn.pressing{background:#c07a10;color:#fff}
+.bpm-knob-wrap{display:flex;flex-direction:column;align-items:center;gap:2px}
+.seq-steps{display:flex;gap:3px;margin:6px 0}
+.st{flex:1;height:42px;background:#3a7aaa;border:1px solid #2a6a95;border-radius:3px;
+  font-size:0.65em;display:flex;align-items:center;justify-content:center;
+  color:#1a1a1a;cursor:pointer;font-weight:700;
+  -webkit-tap-highlight-color:transparent}
+.st.has{background:#eba02f;border-color:#c07a10;color:#1a1a1a}
+.st.cursor{background:#1a1a1a;border-color:#eba02f;border-width:2px;color:#eba02f}
+.st.active{background:#00cc66;border-color:#007a3a;color:#fff;box-shadow:0 0 4px #00cc6644}
+.st.armed{border-color:#bb3321;box-shadow:0 0 6px #bb332166;background:#fff;color:#bb3321}
+.seq-hint{font-size:0.72em;color:#1a1a1a;margin:4px 0 6px;text-align:center;line-height:1.4}
+.seq-hint.armed-msg{color:#bb3321;font-weight:700}
+.seq-info{font-size:0.75em;color:#1a1a1a;display:flex;justify-content:space-between;
+  font-weight:700}
+
+/* Keyboard */
+.kb-panel{background:#e8b820;border:3px solid #c45a08;box-shadow:0 0 0 3px #4a8bc4;
+  border-radius:8px;padding:6px 5px}
+.keys{display:grid;grid-template-columns:repeat(10,1fr);gap:3px;margin:2px 0}
+.key{font-size:0.68em;text-align:center;padding:10px 0;border-radius:7px;
+  background:#c45a08;border:2px solid #8a3200;color:#1a0800;cursor:pointer;
+  font-weight:800;-webkit-tap-highlight-color:transparent;line-height:1.1;
+  user-select:none;-webkit-user-select:none}
+.key.pressed{background:#881800;border-color:#550000;color:#ffcc44;transform:scale(0.91)}
+.key.fn{background:#d4700a;border-color:#994400;color:#1a0800}
+.key.fn.pressed{background:#881800;border-color:#550000;color:#ffcc44;transform:scale(0.91)}
+.key.vowel{background:#d4a800;border-color:#8a6e00}
+.key.vowel.pressed{background:#881800;border-color:#550000;color:#ffcc44}
+
+/* MIDI channel selector */
+.ch-row{display:flex;align-items:center;gap:8px;padding:4px 10px;
+  font-size:0.78em;color:#1a1a1a;font-weight:700}
+.ch-sel{font-size:1em;padding:4px 8px;background:#eba02f;border:2px solid #c07a10;
+  border-radius:4px;color:#1a1a1a;font-family:inherit;font-weight:700;cursor:pointer}
+
+/* Bottom tabs (Status / Sniffer) */
+.btm-tabs{background:#4d8fc2;border:3px solid #e8b820;box-shadow:0 0 0 3px #bb3321;
+  border-radius:8px;margin-bottom:8px;overflow:hidden}
+.btm-bar{display:flex;border-bottom:2px solid #3a7aaa}
+.btm-tab{flex:1;padding:10px 8px;background:#3a7aaa;border:none;
+  border-bottom:3px solid transparent;color:#1a1a1a;font-family:inherit;
+  font-size:0.82em;text-transform:uppercase;letter-spacing:1px;font-weight:700;
+  cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .1s}
+.btm-tab.active{background:#4d8fc2;border-bottom-color:#eba02f}
+.btm-body{padding:10px}
+
+/* Status */
+.status-row{display:flex;justify-content:space-between;font-size:0.82em;
+  padding:4px 0;border-bottom:1px solid #3a7aaa}
+.status-row:last-child{border-bottom:none}
+.status-row .l{color:#1a1a1a;font-weight:700}
+.status-row .v{color:#1a1a1a;font-weight:700}
+.status-row .v.warn{color:#7a3300}
+.status-row .v.err{color:#7a0000}
+
+/* Sniffer */
+.sniff-stats{display:flex;gap:12px;font-size:0.82em;margin-bottom:6px;flex-wrap:wrap}
+.sniff-stats .l{color:#1a1a1a;font-weight:700}
+.sniff-stats .v{color:#003d1a;font-weight:700}
+.sniff-stats .v.off{color:#3a85b8}
+.nibble-stream{font-size:0.75em;line-height:1.6;max-height:160px;overflow-y:auto;
+  background:#0a0a0a;border:1px solid #222;border-radius:4px;padding:6px;
+  word-break:break-all;box-shadow:inset 0 0 8px rgba(0,0,0,0.8);
+  font-family:'Courier New',monospace}
+.nib{display:inline-block;width:1.6em;text-align:center;border-radius:2px;margin:1px}
+.nib-0,.nib-1,.nib-2,.nib-3{color:#00ff88}
+.nib-4,.nib-5,.nib-6,.nib-7{color:#00ccff}
+.nib-8,.nib-9,.nib-a,.nib-b{color:#ffaa00}
+.nib-c,.nib-d,.nib-e,.nib-f{color:#ff6688}
+.sniff-canvas{width:100%;height:50px;display:block;border-radius:4px;background:#0a0a0a;
+  border:1px solid #222;box-shadow:inset 0 0 8px rgba(0,0,0,0.8);margin-bottom:6px}
+.sniff-ctrl{display:flex;gap:6px;margin-top:6px}
+.sniff-btn{font-size:0.78em;padding:5px 12px;background:#eba02f;border:2px solid #c07a10;
+  color:#1a1a1a;border-radius:4px;cursor:pointer;font-family:inherit;font-weight:700;
+  -webkit-tap-highlight-color:transparent}
+.sniff-btn.active{background:#1a1a1a;border-color:#eba02f;color:#eba02f}
+.sniff-legend{font-size:0.75em;display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;color:#1a1a1a}
+
+/* Connection screen — VFD display */
+.screen{background:#080808;border:3px solid #1a1a1a;border-radius:6px;
+  padding:10px 12px;margin-bottom:6px;
+  box-shadow:inset 0 0 20px rgba(0,0,0,0.9)}
+.screen-conn{display:flex;align-items:center;gap:6px;padding-bottom:6px;
+  border-bottom:1px solid #1e1e1e;font-size:0.82em}
+.screen-conn .dot{width:8px;height:8px;border-radius:50%;background:#440000;flex-shrink:0}
+.screen-conn .dot.ok{background:#00cc66;box-shadow:0 0 6px #00cc6699}
+.screen-conn .lbl{color:#33ff66;letter-spacing:0.1em;text-shadow:0 0 6px #33ff6688;
+  font-family:'Courier New',monospace;flex:1;min-width:0;overflow:hidden;
+  white-space:nowrap;text-overflow:ellipsis}
+.conn-icons{display:flex;gap:3px;align-items:center;flex-shrink:0}
+.cicon{font-size:0.65em;padding:2px 5px;border-radius:2px;border:1px solid #444;
+  color:#33553a;font-family:'Courier New',monospace;letter-spacing:0.05em}
+.cicon.on{color:#33ff66;border-color:#33ff66;box-shadow:0 0 3px #33ff6633}
+.pick-btn{font-size:0.72em;padding:4px 10px;background:#eba02f;border:1px solid #c07a10;
+  color:#1a1a1a;border-radius:3px;cursor:pointer;font-family:inherit;font-weight:700;
+  -webkit-tap-highlight-color:transparent}
+.pick-btn:active{background:#c07a10}
+.screen-vals{display:flex;align-items:center;justify-content:space-around;
+  padding:6px 0 2px}
+.sv{font-family:'Courier New',monospace;font-size:0.9em;color:#33ff66;
+  text-shadow:0 0 8px #33ff6666;letter-spacing:0.05em}
+.sv-sep{color:#1a3a2a;font-size:0.7em;padding:0 4px}
+/* Password gate */
+.pw-gate{position:fixed;inset:0;background:#bb3321;z-index:9999;display:flex;
+  align-items:center;justify-content:center;flex-direction:column;gap:12px}
+.pw-frame{background:#e8b820;border:3px solid #e8b820;
+  border-radius:8px;padding:16px 24px;text-align:center;max-width:70%}
+.pw-frame img{max-height:64px;width:100%}
+.pw-gate input{font-size:1em;padding:10px 16px;background:#080808;border:2px solid #c07a10;
+  border-radius:6px;color:#33ff66;font-family:'Courier New',monospace;text-align:center;
+  width:220px;outline:none;letter-spacing:0.1em}
+.pw-gate input::placeholder{color:#33553a}
+.pw-gate button{font-size:0.9em;padding:8px 24px;background:#eba02f;border:2px solid #c07a10;
+  color:#1a1a1a;border-radius:4px;cursor:pointer;font-family:inherit;font-weight:700}
+.pw-gate .pw-err{color:#ff6666;font-size:0.8em;min-height:1.2em}
+</style>
+</head>
+<body>
+<div class="pw-gate" id="pw-gate">
+  <div class="pw-frame"><img src="./logo.svg" alt="Spico &amp; Spelluhh"></div>
+  <input type="password" id="pw-input" placeholder="Password" autocomplete="off">
+  <button id="pw-btn">Enter</button>
+  <div class="pw-err" id="pw-err"></div>
+</div>
+<div class="wrap" style="display:none" id="app-wrap">
+  <div class="logo-wrap">
+    <img src="./logo.svg" alt="Spico &amp; Spelluhh">
+  </div>
+  <div class="screen" id="ble-bar">
+    <div class="screen-conn">
+      <div class="dot" id="conn-dot"></div>
+      <span class="lbl" id="conn-label">Disconnected</span>
+      <span class="lbl" id="conn-ver" style="font-size:0.7em;opacity:0.5">v5.5.0</span>
+      <div class="conn-icons">
+        <span class="cicon" id="b-usb">USB</span>
+        <span class="cicon" id="b-ble">BLE</span>
+        <span class="cicon" id="b-wifi">WiFi</span>
+      </div>
+      <button id="btn-connect" style="font-size:0.75em;padding:5px 12px;background:#eba02f;
+        border:2px solid #c07a10;color:#1a1a1a;border-radius:3px;cursor:pointer;
+        font-family:inherit;font-weight:700;margin-left:2px;
+        -webkit-tap-highlight-color:transparent">Connect</button>
+      <div id="conn-picker" style="display:none;gap:3px;margin-left:2px">
+        <button class="pick-btn" id="pick-ble">BLE</button>
+        <button class="pick-btn" id="pick-usb">USB</button>
+      </div>
+    </div>
+    <div class="screen-vals">
+      <span class="sv" id="sv-freq">--</span>
+      <span class="sv-sep">|</span>
+      <span class="sv" id="sv-fine">Fine --</span>
+      <span class="sv-sep">|</span>
+      <span class="sv" id="sv-vcc">--V</span>
+    </div>
+  </div>
+
+  <!-- ── CONTROLS + SWITCHES (combined) ── -->
+  <div class="card">
+    <div class="knobs-row">
+      <div class="knob-wrap">
+        <svg class="knob" id="knob-pitch" viewBox="0 0 58 58" width="58" height="58" xmlns="http://www.w3.org/2000/svg">
+          <circle class="knob-body" cx="29" cy="29" r="26.5"/>
+          <path class="knob-track" d="M13.44 44.56 A22 22 0 1 1 44.56 44.56"/>
+          <path class="knob-prog" d="M13.44 44.56 A22 22 0 1 1 44.56 44.56"/>
+          <line class="knob-ptr" x1="29" y1="29" x2="29" y2="6"/>
+        </svg>
+        <div class="knob-val" id="v-pitch">63</div>
+        <div class="knob-label">Pitch</div>
+      </div>
+      <div class="knob-wrap">
+        <svg class="knob" id="knob-fine" viewBox="0 0 58 58" width="58" height="58" xmlns="http://www.w3.org/2000/svg">
+          <circle class="knob-body" cx="29" cy="29" r="26.5"/>
+          <path class="knob-track" d="M13.44 44.56 A22 22 0 1 1 44.56 44.56"/>
+          <path class="knob-prog" d="M13.44 44.56 A22 22 0 1 1 44.56 44.56"/>
+          <line class="knob-ptr" x1="29" y1="29" x2="29" y2="6"/>
+        </svg>
+        <div class="knob-val" id="v-fine">0</div>
+        <div class="knob-label">Fine</div>
+      </div>
+      <div class="knob-wrap">
+        <svg class="knob" id="knob-starve" viewBox="0 0 58 58" width="58" height="58" xmlns="http://www.w3.org/2000/svg">
+          <circle class="knob-body" cx="29" cy="29" r="26.5"/>
+          <path class="knob-track" d="M13.44 44.56 A22 22 0 1 1 44.56 44.56"/>
+          <path class="knob-prog" d="M13.44 44.56 A22 22 0 1 1 44.56 44.56"/>
+          <line class="knob-ptr" x1="29" y1="29" x2="29" y2="6"/>
+        </svg>
+        <div class="knob-val" id="v-starve">0</div>
+        <div class="knob-label">Starve</div>
+      </div>
+    </div>
+
+    <div class="sec-div"></div>
+    <div class="glitch-row glitch-8">
+      <div class="gl" data-cc="5"  id="g-1">G1</div>
+      <div class="gl" data-cc="6"  id="g-2">G2</div>
+      <div class="gl" data-cc="7"  id="g-3">G3</div>
+      <div class="gl" data-cc="8"  id="g-4">G4</div>
+      <div class="gl" data-cc="9"  id="g-5">G5</div>
+      <div class="gl" data-cc="10" id="g-6">G6</div>
+      <div class="gl" data-cc="11" id="g-7">G7</div>
+      <div class="gl" data-cc="12" id="g-8">G8</div>
+    </div>
+    <div class="glitch-row glitch-4">
+      <div class="gl" data-cc="3"  id="g-loop">LOOP</div>
+      <div class="gl" data-cc="4"  id="g-hold">HOLD</div>
+      <div class="gl fb" data-cc="13" id="g-fb">FB</div>
+      <div class="gl sk" data-cc="14" id="g-sk">SPK</div>
+    </div>
+    <div class="sec-div"></div>
+    <div class="kb-panel">
+      <div class="keys" id="keyboard"></div>
+    </div>
+  </div>
+
+  <!-- ── LFO ── -->
+  <div class="card">
+    <h2>LFO</h2>
+    <div style="display:flex;gap:6px;align-items:flex-start">
+      <div style="flex:1">
+        <div class="lfo-row">
+          <span class="l">Wave</span>
+          <div class="lfo-sel" id="lfo-wave">
+            <button class="active" data-v="0">Sine</button>
+            <button data-v="32">Tri</button>
+            <button data-v="64">Saw</button>
+            <button data-v="96">Sq</button>
+          </div>
+        </div>
+        <div class="lfo-row">
+          <span class="l">Target</span>
+          <div class="lfo-sel" id="lfo-target">
+            <button data-v="0">Pitch</button>
+            <button data-v="32">Starve</button>
+            <button data-v="64">Glitch</button>
+            <button data-v="96">PWM</button>
+          </div>
+        </div>
+      </div>
+      <div class="lfo-knobs">
+        <div class="knob-wrap">
+          <svg class="knob" id="knob-lfo-rate" viewBox="0 0 58 58" width="48" height="48" xmlns="http://www.w3.org/2000/svg">
+            <circle class="knob-body" cx="29" cy="29" r="26.5"/>
+            <path class="knob-track" d="M13.44 44.56 A22 22 0 1 1 44.56 44.56"/>
+            <path class="knob-prog" d="M13.44 44.56 A22 22 0 1 1 44.56 44.56"/>
+            <line class="knob-ptr" x1="29" y1="29" x2="29" y2="6"/>
+          </svg>
+          <div class="knob-val" id="v-lfo-rate">40</div>
+          <div class="knob-label">Rate</div>
+        </div>
+        <div class="knob-wrap">
+          <svg class="knob" id="knob-lfo-depth" viewBox="0 0 58 58" width="48" height="48" xmlns="http://www.w3.org/2000/svg">
+            <circle class="knob-body" cx="29" cy="29" r="26.5"/>
+            <path class="knob-track" d="M13.44 44.56 A22 22 0 1 1 44.56 44.56"/>
+            <path class="knob-prog" d="M13.44 44.56 A22 22 0 1 1 44.56 44.56"/>
+            <line class="knob-ptr" x1="29" y1="29" x2="29" y2="6"/>
+          </svg>
+          <div class="knob-val" id="v-lfo-depth">0</div>
+          <div class="knob-label">Depth</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SEQUENCER ── -->
+  <div class="card">
+    <h2>Sequencer</h2>
+    <div class="seq-ctrl">
+      <button id="seq-play">&#9654;</button>
+      <div class="bpm-knob-wrap">
+        <svg class="knob" id="knob-bpm" viewBox="0 0 58 58" width="58" height="58" xmlns="http://www.w3.org/2000/svg">
+          <circle class="knob-body" cx="29" cy="29" r="26.5"/>
+          <path class="knob-track" d="M13.44 44.56 A22 22 0 1 1 44.56 44.56"/>
+          <path class="knob-prog" d="M13.44 44.56 A22 22 0 1 1 44.56 44.56"/>
+          <line class="knob-ptr" x1="29" y1="29" x2="29" y2="6"/>
+        </svg>
+        <div class="knob-val" id="v-seq-bpm">120 BPM</div>
+      </div>
+      <button class="seq-mode-btn" id="btn-seq-mode">Fwd</button>
+    </div>
+    <div class="seq-steps" id="seq-steps"></div>
+    <div id="seq-hint" class="seq-hint">Tap a step to arm it, then tap a key to assign. Tap armed step again to cancel.</div>
+    <div class="seq-info">
+      <span>Bank <span id="v-seq-bank">A</span></span>
+      <span id="v-seq-play-state">&#9632; Stopped</span>
+    </div>
+  </div>
+
+  <!-- ── STATUS / SNIFFER ── -->
+  <div class="btm-tabs">
+    <div class="btm-bar">
+      <button class="btm-tab active" id="btm-status-btn">Status</button>
+      <button class="btm-tab" id="btm-sniff-btn">Bus Sniffer</button>
+    </div>
+    <div class="btm-body" id="btm-status">
+      <div class="status-row"><span class="l">Speech</span><span class="v" id="v-speaking">--</span></div>
+      <div class="status-row"><span class="l">Freq</span><span class="v" id="v-freq-status">--</span></div>
+      <div class="status-row"><span class="l">Battery</span><span class="v" id="v-batt">--</span></div>
+      <div class="status-row"><span class="l">MIDI Ch</span><span class="v" id="v-ch">--</span></div>
+      <div class="ch-row"><span class="ch-lbl">Set Ch</span><select id="midi-ch" class="ch-sel"><option value="0">1</option><option value="1">2</option><option value="2">3</option><option value="3">4</option><option value="4">5</option><option value="5">6</option><option value="6">7</option><option value="7">8</option><option value="8">9</option><option value="9">10</option><option value="10">11</option><option value="11">12</option><option value="12">13</option><option value="13">14</option><option value="14">15</option><option value="15">16</option></select></div>
+      <div class="status-row"><span class="l">I2C</span><span class="v" id="v-i2c">--</span></div>
+    </div>
+    <div class="btm-body" id="btm-sniff" style="display:none">
+      <div class="sniff-stats">
+        <span><span class="l">Speech: </span><span class="v" id="v-sniff-speak">--</span></span>
+        <span><span class="l">Events: </span><span class="v" id="v-sniff-events">0</span></span>
+        <span><span class="l">Last: </span><span class="v" id="v-sniff-last">--</span></span>
+        <span><span class="l">Rate: </span><span class="v" id="v-sniff-rate">0 n/s</span></span>
+      </div>
+      <canvas class="sniff-canvas" id="sniff-timeline" height="50"></canvas>
+      <div class="nibble-stream" id="sniff-stream"></div>
+      <div class="sniff-ctrl">
+        <button class="sniff-btn active" id="sniff-run">&#9654; Run</button>
+        <button class="sniff-btn" id="sniff-clear">Clear</button>
+        <button class="sniff-btn" id="sniff-export">Export</button>
+      </div>
+      <div class="sniff-legend">
+        <span><span class="nib nib-0">0</span>-<span class="nib nib-3">3</span> Low</span>
+        <span><span class="nib nib-4">4</span>-<span class="nib nib-7">7</span> Mid-Lo</span>
+        <span><span class="nib nib-8">8</span>-<span class="nib nib-b">B</span> Mid-Hi</span>
+        <span><span class="nib nib-c">C</span>-<span class="nib nib-f">F</span> High</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="sub" style="margin-top:4px;text-align:center;color:#f5c8b8;font-size:0.72em">
+    Circuit-bent 1980 TI Speak &amp; Spell &bull; RP2350 @ 150 MHz &bull; by Kayyluhh
+  </div>
+</div>
+
+<script>
+// Password gate (testing only — remove for public release)
+(function(){
+  var HASH = '4eb09855c482241a431151764746ce2b6af941efbecf429a0f95bea7be898f11';
+  var gate = document.getElementById('pw-gate');
+  var app  = document.getElementById('app-wrap');
+  if (sessionStorage.getItem('spico-auth') === '1') { gate.style.display='none'; app.style.display=''; }
+  async function check() {
+    var pw = document.getElementById('pw-input').value;
+    var buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pw));
+    var hex = Array.from(new Uint8Array(buf)).map(function(b){return b.toString(16).padStart(2,'0')}).join('');
+    if (hex === HASH) {
+      sessionStorage.setItem('spico-auth','1');
+      gate.style.display='none'; app.style.display='';
+    } else {
+      document.getElementById('pw-err').textContent = 'Wrong password';
+      document.getElementById('pw-input').value = '';
+    }
+  }
+  document.getElementById('pw-btn').addEventListener('click', check);
+  document.getElementById('pw-input').addEventListener('keydown', function(e){ if(e.key==='Enter') check(); });
+})();
+
+(function(){
+  var MODES = ['Fwd','Random','PingPong'];
+  // Keyboard layout in visual order (row 0=fn, 1=A-J, 2=K-T, 3=U-ENTER)
+  // Each entry: {l=label, n=MIDI note, fn=is function key}
+  // Note mapping follows hardware D-line matrix:
+  //   D1=U-Y(36-40) D2=K-O(41-45) D3=OFF-CLUE(46-50)
+  //   D4=A-E(51-55) D5=F-J(56-60) D6=MYST-ON(61-65)
+  //   D7=P-T(66-70) D8=Z-ENTER(71-75)
+  var KB = [
+    // Row 0: function keys (D3 left, D6 right)
+    {l:'OFF',n:46,fn:1},{l:'GO',n:47,fn:1},{l:'RPL',n:48,fn:1},{l:'//',n:49,fn:1},{l:'CLUE',n:50,fn:1},
+    {l:'?',n:61,fn:1},{l:'CODE',n:62,fn:1},{l:'??',n:63,fn:1},{l:':)',n:64,fn:1},{l:'ON',n:65,fn:1},
+    // Row 1: A-J (D4, D5)
+    {l:'A',n:51,v:1},{l:'B',n:52},{l:'C',n:53},{l:'D',n:54},{l:'E',n:55,v:1},
+    {l:'F',n:56},{l:'G',n:57},{l:'H',n:58},{l:'I',n:59,v:1},{l:'J',n:60},
+    // Row 2: K-T (D2, D7)
+    {l:'K',n:41},{l:'L',n:42},{l:'M',n:43},{l:'N',n:44},{l:'O',n:45,v:1},
+    {l:'P',n:66},{l:'Q',n:67},{l:'R',n:68},{l:'S',n:69},{l:'T',n:70},
+    // Row 3: U-ENTER (D1, D8)
+    {l:'U',n:36,v:1},{l:'V',n:37},{l:'W',n:38},{l:'X',n:39},{l:'Y',n:40,v:1},
+    {l:'Z',n:71},{l:'MOD',n:72},{l:'#',n:73},{l:'DEL',n:74},{l:'ENT',n:75}
+  ];
+
+  var userDriving = {};
+  var connected = false;
+  var stepNotes = new Array(16).fill(0);
+  var seqLen = 16;
+  var seqBankDisplay = 0;
+  var armedStep = -1;
+  var seqModeIdx = 0;
+
+  function $(id){ return document.getElementById(id); }
+
+  // ================================================================
+  // KNOB FACTORY — SVG encoder with arc progress + center pointer
+  // Arc: 270° sweep from lower-left (7:30) clockwise to lower-right (4:30)
+  // Arc length = 2π × 22 × (270/360) ≈ 103.67
+  // Progress: stroke-dasharray reveals frac of arc from start
+  // Pointer: line from center (29,29) to edge, angle tracks value
+  // Double-tap: reset to initVal
+  // ================================================================
+  var KNB_ARC = 103.67;  // total arc length in SVG units
+  var KNB_CX  = 29, KNB_CY = 29, KNB_R_PTR = 23;
+  var knobs = {};
+
+  function makeKnob(elId, cc, initVal, sensitivity, displayFn) {
+    sensitivity = sensitivity || 150;
+    var el = $(elId);
+    if (!el) return { setValue: function(){}, getValue: function(){ return initVal; } };
+    var progEl = el.querySelector('.knob-prog');
+    var ptrEl  = el.querySelector('.knob-ptr');
+    var wrap = el.parentElement;
+    var valEl = wrap ? wrap.querySelector('.knob-val') : null;
+    var curVal = initVal;
+    var startY = 0, startVal = 0, captured = false;
+    var tapStartY = 0, lastTap = 0;
+
+    function setVal(v) {
+      curVal = Math.max(0, Math.min(127, Math.round(v)));
+      var frac = curVal / 127;
+      // Progress arc: reveals frac of total arc from start point
+      if (progEl) progEl.style.strokeDasharray = (KNB_ARC * frac).toFixed(1) + ' ' + KNB_ARC;
+      // Pointer: SVG 135° (min) → 405°/45° (max), center to edge
+      if (ptrEl) {
+        var svgDeg = 135 + frac * 270;
+        var rad = svgDeg * Math.PI / 180;
+        ptrEl.setAttribute('x2', (KNB_CX + KNB_R_PTR * Math.cos(rad)).toFixed(1));
+        ptrEl.setAttribute('y2', (KNB_CY + KNB_R_PTR * Math.sin(rad)).toFixed(1));
+      }
+      if (valEl) valEl.textContent = displayFn ? displayFn(curVal) : curVal;
+    }
+    setVal(initVal);
+
+    el.addEventListener('touchstart', function(e) {
+      e.preventDefault();
+      tapStartY = e.touches[0].clientY;
+      startY = e.touches[0].clientY;
+      startVal = curVal;
+      captured = true;
+      el.classList.add('active');
+      userDriving[cc] = true;
+    }, {passive:false});
+
+    el.addEventListener('touchmove', function(e) {
+      if (!captured) return;
+      e.preventDefault();
+      var dy = startY - e.touches[0].clientY;
+      setVal(startVal + (dy / sensitivity) * 127);
+      sendCC(cc, curVal);
+    }, {passive:false});
+
+    el.addEventListener('touchend', function(e) {
+      e.preventDefault();
+      captured = false;
+      el.classList.remove('active');
+      var moved = Math.abs(e.changedTouches[0].clientY - tapStartY);
+      if (moved < 8) {
+        var now = Date.now();
+        if (now - lastTap < 350) {
+          setVal(initVal);
+          sendCC(cc, curVal);
+          lastTap = 0;
+        } else {
+          lastTap = now;
+        }
+      }
+      setTimeout(function(){ delete userDriving[cc]; }, 300);
+    }, {passive:false});
+
+    el.addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      startY = e.clientY; startVal = curVal; captured = true;
+      el.classList.add('active'); userDriving[cc] = true;
+    });
+    document.addEventListener('mousemove', function(e) {
+      if (!captured) return;
+      var dy = startY - e.clientY;
+      setVal(startVal + (dy / sensitivity) * 127);
+      sendCC(cc, curVal);
+    });
+    document.addEventListener('mouseup', function() {
+      if (!captured) return;
+      captured = false;
+      el.classList.remove('active');
+      setTimeout(function(){ delete userDriving[cc]; }, 300);
+    });
+    el.addEventListener('dblclick', function(e) {
+      e.preventDefault(); setVal(initVal); sendCC(cc, curVal);
+    });
+
+    return {
+      setValue: function(v){ if (!userDriving[cc]) setVal(v); },
+      getValue: function(){ return curVal; }
+    };
+  }
+
+  // Create all knobs
+  knobs.pitch  = makeKnob('knob-pitch',      1,  63, 150);
+  knobs.fine   = makeKnob('knob-fine',       33, 63, 80,
+    function(v){ var d = v-63; var s = (d >= 0 ? '+' : '')+d; var el = $('sv-fine'); if (el) el.textContent = 'Fine '+s; return s; });
+  knobs.starve = makeKnob('knob-starve',     2,  0,  150);
+  knobs.rate   = makeKnob('knob-lfo-rate',   15, 40, 150);
+  knobs.depth  = makeKnob('knob-lfo-depth',  16, 0,  150);
+  knobs.bpm    = makeKnob('knob-bpm',        20, 64, 150,
+    function(v){ return Math.round(60 + v/127*180)+' BPM'; });
+
+  // ---- Bottom tabs (Status / Sniffer) ----
+  var btmBtns   = { status: $('btm-status-btn'), sniff: $('btm-sniff-btn') };
+  var btmPanels = { status: $('btm-status'),     sniff: $('btm-sniff')     };
+  function switchBtm(name) {
+    Object.keys(btmBtns).forEach(function(k){
+      btmBtns[k].classList.toggle('active', k === name);
+      btmPanels[k].style.display = k === name ? '' : 'none';
+    });
+    if (name === 'sniff') sniffDraw();
+  }
+  Object.keys(btmBtns).forEach(function(name){
+    btmBtns[name].addEventListener('click', function(){ switchBtm(name); });
+  });
+
+  // ---- Sniffer engine ----
+  var HEX = '0123456789ABCDEF';
+  var sniffRunning = true;
+  var sniffNibbles = [];
+  var sniffDisplayMax = 2048;
+  var sniffStreamEl = $('sniff-stream');
+  var sniffCanvas = $('sniff-timeline');
+  var sniffCtx = sniffCanvas ? sniffCanvas.getContext('2d') : null;
+  var SNIFF_BINS = 150;
+  var sniffBins = new Array(SNIFF_BINS).fill(0);
+  var sniffBinIdx = 0;
+  var sniffLastBinTime = Date.now();
+  var sniffPrevEvents = 0;
+  var sniffPrevRateTime = Date.now();
+  var sniffFailCount = 0;
+
+  function sniffAddNibbles(arr) {
+    for (var i = 0; i < arr.length; i++) {
+      var n = arr[i] & 0xF;
+      sniffNibbles.push(n);
+      var span = document.createElement('span');
+      span.className = 'nib nib-' + HEX[n].toLowerCase();
+      span.textContent = HEX[n];
+      sniffStreamEl.appendChild(span);
+    }
+    while (sniffStreamEl.childNodes.length > sniffDisplayMax)
+      sniffStreamEl.removeChild(sniffStreamEl.firstChild);
+    sniffStreamEl.scrollTop = sniffStreamEl.scrollHeight;
+    sniffBins[sniffBinIdx % SNIFF_BINS] += arr.length;
+  }
+
+  function sniffDraw() {
+    if (!sniffCanvas || !sniffCtx) return;
+    var w = sniffCanvas.width = sniffCanvas.clientWidth * (window.devicePixelRatio || 1);
+    var h = sniffCanvas.height = 50 * (window.devicePixelRatio || 1);
+    sniffCtx.clearRect(0, 0, w, h);
+    var max = 1;
+    for (var i = 0; i < SNIFF_BINS; i++) max = Math.max(max, sniffBins[i]);
+    var barW = w / SNIFF_BINS;
+    for (var i = 0; i < SNIFF_BINS; i++) {
+      var idx = (sniffBinIdx + 1 + i) % SNIFF_BINS;
+      var val = sniffBins[idx];
+      if (!val) continue;
+      var barH = (val / max) * (h - 4);
+      var intensity = val / max;
+      sniffCtx.fillStyle = intensity < 0.5 ? '#00ff88' : intensity < 0.8 ? '#ffaa00' : '#ff6688';
+      sniffCtx.fillRect(i * barW, h - barH, barW - 1, barH);
+    }
+  }
+
+  function sniffPoll() {
+    if (!sniffRunning) return;
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/sniffer', true);
+    xhr.timeout = 2000;
+    xhr.onload = function(){
+      if (xhr.status === 200) {
+        try {
+          var d = JSON.parse(xhr.responseText);
+          $('v-sniff-speak').textContent = d.speaking ? 'Active' : 'Idle';
+          $('v-sniff-speak').className = 'v' + (d.speaking ? '' : ' off');
+          $('v-sniff-events').textContent = d.events.toLocaleString();
+          $('v-sniff-last').textContent = d.last_ms > 0 ? d.last_ms + ' ms' : '--';
+          var now = Date.now(), dt = (now - sniffPrevRateTime) / 1000;
+          if (dt > 0.5) {
+            $('v-sniff-rate').textContent = Math.round((d.events - sniffPrevEvents) / dt) + ' n/s';
+            sniffPrevEvents = d.events; sniffPrevRateTime = now;
+          }
+          if (now - sniffLastBinTime > 200) {
+            sniffBinIdx = (sniffBinIdx + 1) % SNIFF_BINS;
+            sniffBins[sniffBinIdx] = 0; sniffLastBinTime = now;
+          }
+          if (d.nibbles.length > 0) sniffAddNibbles(d.nibbles);
+          sniffDraw(); sniffFailCount = 0;
+        } catch(e){}
+      }
+    };
+    xhr.onerror = xhr.ontimeout = function(){ sniffFailCount++; };
+    xhr.send();
+  }
+
+  $('sniff-run').addEventListener('click', function(){
+    sniffRunning = !sniffRunning;
+    this.innerHTML = sniffRunning ? '&#9654; Run' : '&#9724; Pause';
+    if (sniffRunning) this.classList.add('active'); else this.classList.remove('active');
+  });
+  $('sniff-clear').addEventListener('click', function(){
+    sniffStreamEl.innerHTML = ''; sniffNibbles = [];
+    sniffBins = new Array(SNIFF_BINS).fill(0); sniffDraw();
+  });
+  $('sniff-export').addEventListener('click', function(){
+    if (!sniffNibbles.length) return;
+    var csv = 'index,nibble_hex,nibble_dec\n';
+    for (var i = 0; i < sniffNibbles.length; i++)
+      csv += i + ',' + HEX[sniffNibbles[i]] + ',' + sniffNibbles[i] + '\n';
+    var blob = new Blob([csv], {type:'text/csv'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'ctl_bus_' + new Date().toISOString().slice(0,19).replace(/:/g,'-') + '.csv';
+    a.click(); URL.revokeObjectURL(a.href);
+  });
+  setInterval(sniffPoll, 200);
+
+  // ---- MIDI channel selector ----
+  $('midi-ch').addEventListener('change', function(){
+    var ch = +this.value;
+    sendSysex(new Uint8Array([0xF0, 0x7D, 0x53, 0x53, 0x43, 0x48, ch, 0xF7]));
+  });
+
+  // ---- MIDI transport abstraction ----
+  var MIDI_SERVICE = '03b80e5a-ede8-4b33-a751-6ce34ec4c700';
+  var MIDI_CHAR    = '7772e5db-3868-4112-a1a9-f2669d106bf3';
+  var hasWebMidi   = !!navigator.requestMIDIAccess;
+  var transport = null;   // {type:'ble'|'usb', send:fn(bytes), close:fn()}
+  var bleDevice = null;
+  var midiAccess = null;
+
+  function bleTimestamp() {
+    var t = Date.now() & 0x1FFF;
+    return [0x80 | ((t >> 7) & 0x3F), 0x80 | (t & 0x7F)];
+  }
+  function createBleTransport(characteristic) {
+    return {
+      type: 'ble',
+      send: function(bytes) {
+        var ts = bleTimestamp();
+        var buf = new Uint8Array(2 + bytes.length);
+        buf[0] = ts[0]; buf[1] = ts[1];
+        buf.set(bytes, 2);
+        characteristic.writeValueWithoutResponse(buf).catch(function(){});
+      },
+      close: function() {
+        if (bleDevice && bleDevice.gatt.connected) bleDevice.gatt.disconnect();
+      }
+    };
+  }
+  function sendCC(cc, val) {
+    if (!transport) return;
+    transport.send(new Uint8Array([0xB0, cc & 0x7F, val & 0x7F]));
+  }
+  function sendNote(note, vel) {
+    if (!transport) return;
+    transport.send(new Uint8Array([vel > 0 ? 0x90 : 0x80, note & 0x7F, vel & 0x7F]));
+  }
+  function sendSeqStep(bank, step, val) {
+    if (!transport) return;
+    transport.send(new Uint8Array([0xB0, 23, (bank * 32) & 0x7F]));
+    transport.send(new Uint8Array([0xB0, 24, step & 0x7F]));
+    transport.send(new Uint8Array([0xB0, 25, val & 0x7F]));
+  }
+  function sendSysex(bytes) {
+    if (!transport) return;
+    transport.send(new Uint8Array(bytes));
+  }
+  function requestState() {
+    if (!transport) return;
+    transport.send(new Uint8Array([0xF0, 0x7D, 0x53, 0x53, 0x53, 0x52, 0xF7]));
+  }
+
+  // ---- USB MIDI (WebMIDI) transport ----
+  function handleUsbMidiMessage(event) {
+    var data = event.data;
+    if (data.length < 2) return;
+    if (data[0] === 0xF0) {
+      var inner = [];
+      for (var i = 1; i < data.length - 1; i++) inner.push(data[i]);
+      if (inner.length >= 5) decodeSysexState(inner);
+    }
+  }
+  function createUsbTransport(midiOutput, midiInput) {
+    midiInput.onmidimessage = handleUsbMidiMessage;
+    return {
+      type: 'usb',
+      send: function(bytes) { midiOutput.send(Array.from(bytes)); },
+      close: function() {
+        midiInput.onmidimessage = null;
+        midiOutput.close(); midiInput.close();
+        midiAccess = null;
+      }
+    };
+  }
+  function connectUsb() {
+    $('conn-label').textContent = 'Requesting MIDI\u2026';
+    navigator.requestMIDIAccess({sysex: true}).then(function(access) {
+      midiAccess = access;
+      var outputs = Array.from(access.outputs.values());
+      var inputs  = Array.from(access.inputs.values());
+      var out = outputs.find(function(o){ return o.name && o.name.indexOf('Spico') >= 0; }) || outputs[0];
+      var inp = inputs.find(function(i){ return i.name && i.name.indexOf('Spico') >= 0; }) || inputs[0];
+      if (!out || !inp) {
+        $('conn-label').textContent = 'No MIDI device found';
+        return;
+      }
+      return Promise.all([out.open(), inp.open()]).then(function() {
+        transport = createUsbTransport(out, inp);
+        connected = true;
+        $('conn-dot').classList.add('ok');
+        $('conn-label').textContent = 'Connected (USB)';
+        badge('b-usb', true);
+        $('btn-connect').textContent = 'Disconnect';
+        access.onstatechange = function(e) {
+          if (e.port.state === 'disconnected' && transport && transport.type === 'usb') {
+            onDisconnect();
+          }
+        };
+        requestState();
+      });
+    }).catch(function(err) {
+      $('conn-label').textContent = err.message.indexOf('denied') >= 0
+        ? 'MIDI access denied' : 'Error: ' + err.message;
+    });
+  }
+
+  // ---- Build sequencer steps ----
+  var seqEl = $('seq-steps');
+  for (var i = 0; i < 16; i++) {
+    var d = document.createElement('div');
+    d.className = 'st'; d.id = 'st-'+i; d.dataset.step = i;
+    seqEl.appendChild(d);
+  }
+
+  // ---- Build keyboard ----
+  var kbEl = $('keyboard');
+  KB.forEach(function(key) {
+    var k = document.createElement('div');
+    k.className = 'key' + (key.fn ? ' fn' : '') + (key.v ? ' vowel' : '');
+    k.textContent = key.l;
+    k.dataset.note = key.n;
+    kbEl.appendChild(k);
+  });
+
+  // ---- Glitch switches (optimistic local toggle) ----
+  var HOLD_THRESHOLD = 300;
+  document.querySelectorAll('.gl[data-cc]').forEach(function(el){
+    var downTime = 0, wasOn = false;
+
+    function pressStart() {
+      wasOn = el.classList.contains('on');
+      downTime = Date.now();
+      el.classList.add('pressing');
+      if (!wasOn) {
+        el.classList.add('on');
+        sendCC(+el.dataset.cc, 127);
+      }
+    }
+    function pressEnd() {
+      el.classList.remove('pressing');
+      if (!downTime) return;
+      var dur = Date.now() - downTime; downTime = 0;
+      if (dur < HOLD_THRESHOLD) {
+        if (wasOn) { el.classList.remove('on'); sendCC(+el.dataset.cc, 0); }
+      } else {
+        el.classList.remove('on'); sendCC(+el.dataset.cc, 0);
+      }
+    }
+    el.addEventListener('mousedown',   function(e){ e.preventDefault(); pressStart(); });
+    el.addEventListener('mouseup',     function(e){ e.preventDefault(); pressEnd(); });
+    el.addEventListener('mouseleave',  function(){ if (downTime) pressEnd(); });
+    el.addEventListener('touchstart',  function(e){ e.preventDefault(); pressStart(); }, {passive:false});
+    el.addEventListener('touchend',    function(e){ e.preventDefault(); pressEnd(); }, {passive:false});
+    el.addEventListener('touchcancel', function(){ if (downTime) pressEnd(); });
+    el.addEventListener('click',       function(e){ e.preventDefault(); });
+  });
+
+  // ---- LFO selectors (optimistic active state) ----
+  function bindLfoSel(containerId, cc) {
+    var container = $(containerId);
+    container.querySelectorAll('button').forEach(function(btn){
+      btn.addEventListener('touchstart', function(){ btn.classList.add('pressing'); }, {passive:true});
+      btn.addEventListener('touchend',   function(){ btn.classList.remove('pressing'); }, {passive:true});
+      btn.addEventListener('click', function(){
+        container.querySelectorAll('button').forEach(function(b){ b.classList.remove('active'); });
+        btn.classList.add('active');
+        sendCC(cc, +btn.dataset.v);
+      });
+    });
+  }
+  bindLfoSel('lfo-wave',   17);
+  bindLfoSel('lfo-target', 18);
+
+  // ---- Sequencer play / mode ----
+  var seqPlayBtn = $('seq-play');
+  seqPlayBtn.addEventListener('touchstart', function(){ seqPlayBtn.classList.add('pressing'); }, {passive:true});
+  seqPlayBtn.addEventListener('touchend',   function(){ seqPlayBtn.classList.remove('pressing'); }, {passive:true});
+  seqPlayBtn.addEventListener('click', function(){
+    sendCC(19, seqPlayBtn.classList.contains('active') ? 0 : 127);
+  });
+
+  var SEQ_MODE_VALS = [0, 42, 85];
+  var modBtn = $('btn-seq-mode');
+  modBtn.addEventListener('touchstart', function(){ modBtn.classList.add('pressing'); }, {passive:true});
+  modBtn.addEventListener('touchend',   function(){ modBtn.classList.remove('pressing'); }, {passive:true});
+  modBtn.addEventListener('click', function(){
+    seqModeIdx = (seqModeIdx + 1) % 3;
+    sendCC(22, SEQ_MODE_VALS[seqModeIdx]);
+    modBtn.textContent = MODES[seqModeIdx];
+  });
+
+  // ---- Sequencer step arm/assign ----
+  function updateSeqHint() {
+    var h = $('seq-hint');
+    if (armedStep >= 0) {
+      h.textContent = 'Step '+(armedStep+1)+' armed \u2014 open Keyboard and tap a key. Tap step again to cancel.';
+      h.className = 'seq-hint armed-msg';
+    } else {
+      h.textContent = 'Tap a step to arm it (glows white), then open Keyboard and tap a key to assign a note.';
+      h.className = 'seq-hint';
+    }
+  }
+  seqEl.addEventListener('click', function(e){
+    var el = e.target; if (el.dataset.step === undefined) return;
+    var step = parseInt(el.dataset.step);
+    if (armedStep === step) {
+      armedStep = -1;
+    } else if (el.classList.contains('has') && armedStep < 0) {
+      stepNotes[step] = 0; sendSeqStep(seqBankDisplay, step, 0); renderSteps(-1); return;
+    } else {
+      armedStep = step;
+    }
+    updateSeqHint(); renderSteps(-1);
+  });
+
+  // ---- Keyboard ----
+  kbEl.addEventListener('mousedown', function(e){
+    if (e.target.dataset.note){
+      var note = +e.target.dataset.note;
+      if (armedStep >= 0) {
+        stepNotes[armedStep] = note;
+        sendSeqStep(seqBankDisplay, armedStep, note);
+        armedStep = -1; updateSeqHint(); renderSteps(-1);
+        e.target.classList.add('pressed');
+        setTimeout(function(){ e.target.classList.remove('pressed'); }, 150);
+      } else {
+        e.target.classList.add('pressed'); sendNote(note, 127);
+      }
+    }
+  });
+  kbEl.addEventListener('mouseup', function(e){
+    if (e.target.dataset.note){ e.target.classList.remove('pressed'); sendNote(+e.target.dataset.note, 0); }
+  });
+  kbEl.addEventListener('mouseleave', function(e){
+    if (e.target.dataset.note){ e.target.classList.remove('pressed'); sendNote(+e.target.dataset.note, 0); }
+  });
+  kbEl.addEventListener('touchstart', function(e){
+    e.preventDefault();
+    var t = e.changedTouches[0];
+    var el = document.elementFromPoint(t.clientX, t.clientY);
+    if (el && el.dataset.note) {
+      var note = +el.dataset.note;
+      if (armedStep >= 0) {
+        stepNotes[armedStep] = note;
+        sendSeqStep(seqBankDisplay, armedStep, note);
+        armedStep = -1; updateSeqHint(); renderSteps(-1);
+        el.classList.add('pressed');
+        setTimeout(function(){ el.classList.remove('pressed'); }, 150);
+      } else {
+        el.classList.add('pressed'); sendNote(note, 127);
+      }
+    }
+  }, {passive:false});
+  kbEl.addEventListener('touchend', function(e){
+    e.preventDefault();
+    var t = e.changedTouches[0];
+    var el = document.elementFromPoint(t.clientX, t.clientY);
+    if (el && el.dataset.note && armedStep < 0){
+      el.classList.remove('pressed'); sendNote(+el.dataset.note, 0);
+    }
+  }, {passive:false});
+
+  // ---- Helpers ----
+  function badge(id, on){ var el=$(id); if(el){ if(on) el.classList.add('on'); else el.classList.remove('on'); } }
+  function glitch(id, on){ var el=$(id); if(el){ if(on) el.classList.add('on'); else el.classList.remove('on'); } }
+  function fmtFreq(hz){
+    if (hz >= 1000000) return (hz/1000000).toFixed(2)+' MHz';
+    if (hz >= 1000)    return (hz/1000).toFixed(1)+' kHz';
+    return hz+' Hz';
+  }
+  function updateLfoSel(containerId, activeVal){
+    var zone = Math.min(3, Math.floor(activeVal / 32));
+    $(containerId).querySelectorAll('button').forEach(function(btn, i){
+      btn.classList.toggle('active', i === zone);
+    });
+  }
+  function stepLabel(note) {
+    if (!note || note < 36) return '';
+    for (var i = 0; i < KB.length; i++) {
+      if (KB[i].n === note) {
+        var l = KB[i].l; return l.length <= 2 ? l : l.substring(0, 2);
+      }
+    }
+    return '?';
+  }
+  function renderSteps(activeStep, cursorStep) {
+    for (var i = 0; i < 16; i++) {
+      var el = $('st-'+i); if (!el) continue;
+      var has = stepNotes[i] > 0;
+      el.className = 'st' + (has ? ' has' : '') +
+                     (i === activeStep  ? ' active' : '') +
+                     (i === cursorStep  ? ' cursor' : '') +
+                     (i === armedStep   ? ' armed'  : '');
+      el.textContent = has ? stepLabel(stepNotes[i]) : (i === armedStep ? '?' : '');
+      el.style.display = (i < seqLen) ? '' : 'none';
+    }
+  }
+
+  // ---- State handler ----
+  function handleState(s) {
+    if (!connected) {
+      connected = true;
+      $('conn-dot').classList.add('ok');
+      $('conn-label').textContent = 'Connected';
+    }
+    var freqStr = fmtFreq(s.freq_hz);
+    if ($('sv-freq')) $('sv-freq').textContent = freqStr;
+    var _fd = knobs.fine.getValue() - 63; if ($('sv-fine')) $('sv-fine').textContent = 'Fine ' + (_fd >= 0 ? '+' : '') + _fd;
+    if ($('sv-vcc')) $('sv-vcc').textContent = (s.batt_mv / 1000).toFixed(1) + 'V';
+    if ($('v-freq-status')) $('v-freq-status').textContent = freqStr;
+
+    knobs.pitch.setValue(s.pitch_cc !== undefined ? s.pitch_cc : 63);
+    knobs.starve.setValue(Math.round(s.starve / 256 * 127));
+
+    glitch('g-loop', s.sr & (1<<0)); glitch('g-hold', s.sr & (1<<1));
+    glitch('g-1',    s.sr & (1<<2)); glitch('g-2',    s.sr & (1<<3));
+    glitch('g-3',    s.sr & (1<<4)); glitch('g-4',    s.sr & (1<<5));
+    glitch('g-5', s.cart&1);  glitch('g-6', s.cart&2);
+    glitch('g-7', s.cart&4);  glitch('g-8', s.cart&8);
+    glitch('g-fb', s.cart&16); glitch('g-sk', s.cart&32);
+
+    updateLfoSel('lfo-wave',   s.lfo.wave);
+    updateLfoSel('lfo-target', s.lfo.target);
+    knobs.rate.setValue(s.lfo.rate);
+    knobs.depth.setValue(s.lfo.depth);
+
+    seqLen = s.seq.len || 16; seqBankDisplay = s.seq.bank;
+    for (var i = 0; i < 16 && i < s.seq.steps.length; i++) stepNotes[i] = s.seq.steps[i];
+    $('v-seq-bank').textContent = String.fromCharCode(65 + s.seq.bank);
+    knobs.bpm.setValue(Math.round((s.seq.bpm - 60) / 180 * 127));
+    seqModeIdx = s.seq.mode || 0;
+    $('btn-seq-mode').textContent = MODES[seqModeIdx] || '?';
+    $('v-seq-play-state').textContent = s.seq.play ? '\u25B6 Playing' : '\u25A0 Stopped';
+    $('v-seq-play-state').style.color = s.seq.play ? '#00ff88' : '#888';
+    var pb = $('seq-play'); pb.classList.toggle('active', s.seq.play);
+    pb.innerHTML = s.seq.play ? '&#9632;' : '&#9654;';
+    renderSteps(s.seq.play ? s.seq.step : -1, s.seq.cursor);
+
+    badge('b-usb', s.usb); badge('b-ble', s.ble); badge('b-wifi', s.wifi);
+    $('v-speaking').textContent = s.speaking ? 'Active' : 'Idle';
+    $('v-batt').textContent = (s.batt_mv / 1000).toFixed(1) + 'V';
+    $('v-batt').className = 'v' + (s.batt_mv < 2000 ? ' err' : s.batt_mv < 3000 ? ' warn' : '');
+    $('v-ch').textContent = s.midi_ch;
+    $('midi-ch').value = s.midi_ch - 1;
+    $('v-i2c').textContent = s.i2c_ok ? 'OK (400k)' : 'Degraded (100k)';
+    $('v-i2c').className = 'v' + (s.i2c_ok ? '' : ' warn');
+  }
+
+  // ---- SysEx decoder (shared by BLE + USB) ----
+  var sysexBuf = [], inSysex = false;
+  function handleBleNotification(event) {
+    var raw = new Uint8Array(event.target.value.buffer);
+    if (raw.length < 3) return;
+    var i = 1;
+    while (i < raw.length) {
+      if ((raw[i] & 0x80) && raw[i] !== 0xF0 && raw[i] !== 0xF7) { i++; continue; }
+      if (i >= raw.length) break;
+      var b = raw[i++];
+      if (b === 0xF0) { inSysex = true; sysexBuf = []; }
+      else if (b === 0xF7) {
+        if (inSysex && sysexBuf.length >= 5) decodeSysexState(sysexBuf);
+        inSysex = false; sysexBuf = [];
+      } else if (inSysex) sysexBuf.push(b);
+    }
+  }
+  function decodeSysexState(d) {
+    if (d.length < 47 || d[3] !== 0x53 || d[4] !== 0x44) return;
+    var p = d.slice(5);
+    var steps = []; for (var i = 0; i < 16; i++) steps.push(p[26+i]);
+    handleState({
+      freq_hz:(p[0]<<14)|(p[1]<<7)|p[2], period:(p[3]<<7)|p[4],
+      batt_mv:(p[5]<<7)|p[6],
+      speaking:!!(p[7]&1), usb:!!(p[7]&2), ble:!!(p[7]&4), wifi:!!(p[7]&8), i2c_ok:!!(p[7]&16),
+      midi_ch:p[8]+1, pitch_cc:p[9], starve:(p[10]<<7)|p[11], sr:p[12], cart:p[13],
+      lfo:{wave:p[14], target:p[15], rate:p[16], depth:p[17]},
+      seq:{play:!!p[18], step:p[19], bank:p[20], bpm:((p[21]<<7)|p[22])+60,
+           len:p[23], mode:p[24], cursor:p[25], steps:steps}
+    });
+  }
+
+  // ---- Connection picker + BLE/USB connect ----
+  function showPicker() {
+    var picker = $('conn-picker');
+    picker.style.display = 'flex';
+    $('btn-connect').style.display = 'none';
+    $('pick-usb').style.display = hasWebMidi ? '' : 'none';
+  }
+  function hidePicker() {
+    $('conn-picker').style.display = 'none';
+    $('btn-connect').style.display = '';
+  }
+  function connectBle() {
+    hidePicker();
+    $('conn-label').textContent = 'Scanning\u2026';
+    navigator.bluetooth.requestDevice({filters:[{services:[MIDI_SERVICE]}]})
+    .then(function(device){
+      bleDevice = device;
+      device.addEventListener('gattserverdisconnected', onDisconnect);
+      $('conn-label').textContent = 'Connecting\u2026';
+      return device.gatt.connect();
+    })
+    .then(function(s){ return s.getPrimaryService(MIDI_SERVICE); })
+    .then(function(s){ return s.getCharacteristic(MIDI_CHAR); })
+    .then(function(c){
+      transport = createBleTransport(c);
+      c.addEventListener('characteristicvaluechanged', handleBleNotification);
+      return c.startNotifications();
+    })
+    .then(function(){
+      connected = true;
+      $('conn-dot').classList.add('ok');
+      $('conn-label').textContent = 'Connected (BLE)';
+      badge('b-ble', true);
+      $('btn-connect').textContent = 'Disconnect';
+      requestState();
+    })
+    .catch(function(err){
+      $('conn-label').textContent =
+        err.message.indexOf('cancel') >= 0 ? 'Disconnected' : 'Error: '+err.message;
+    });
+  }
+
+  $('btn-connect').addEventListener('click', function(){
+    if (transport) {
+      var type = transport.type;
+      transport.close();
+      // BLE disconnect fires gattserverdisconnected → onDisconnect automatically;
+      // USB needs explicit onDisconnect since port.close() doesn't trigger it
+      if (type === 'usb') onDisconnect();
+      return;
+    }
+    if (!hasWebMidi) { connectBle(); return; }
+    showPicker();
+  });
+  $('pick-ble').addEventListener('click', function(){ connectBle(); });
+  $('pick-usb').addEventListener('click', function(){ hidePicker(); connectUsb(); });
+
+  function onDisconnect(){
+    connected = false; transport = null;
+    bleDevice = null; midiAccess = null;
+    sysexBuf = []; inSysex = false;
+    $('conn-dot').classList.remove('ok');
+    $('conn-label').textContent = 'Disconnected';
+    badge('b-ble', false); badge('b-usb', false);
+    $('btn-connect').textContent = 'Connect';
+    hidePicker();
+  }
+
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(function(){});
+})();
+</script>
+</body>
+</html>
