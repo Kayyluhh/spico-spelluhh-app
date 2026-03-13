@@ -785,10 +785,7 @@ body{background:#bb3321;color:#fff;font-family:'Nunito',sans-serif;font-size:14p
   var usbSysexBuf = [], usbInSysex = false;
   var _dbgRx = 0, _dbgSysex = 0, _dbgState = 0;
   function _dbgUpdate() {
-    var el = $('conn-label');
-    if (el && transport && transport.type === 'usb') {
-      el.textContent = 'USB rx:' + _dbgRx + ' syx:' + _dbgSysex + ' st:' + _dbgState;
-    }
+    document.title = 'rx:' + _dbgRx + ' syx:' + _dbgSysex + ' st:' + _dbgState;
   }
   function handleUsbMidiMessage(event) {
     var data = event.data;
