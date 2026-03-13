@@ -783,15 +783,19 @@ body{background:#bb3321;color:#fff;font-family:'Nunito',sans-serif;font-size:14p
 
   // ---- USB MIDI (WebMIDI) transport ----
   var usbSysexBuf = [], usbInSysex = false;
-  var _dbgRx = 0, _dbgSysex = 0, _dbgState = 0;
+  var _dbgRx = 0, _dbgSysex = 0, _dbgState = 0, _dbgLast = '';
   function _dbgUpdate() {
-    document.title = _dbgRx + '/' + _dbgSysex + '/' + _dbgState;
-    $('conn-label').textContent = _dbgRx + '/' + _dbgSysex + '/' + _dbgState;
+    $('conn-label').textContent = _dbgRx + '/' + _dbgSysex + '/' + _dbgState + ' ' + _dbgLast;
   }
   function handleUsbMidiMessage(event) {
     var data = event.data;
     if (!data || data.length < 1) return;
-    _dbgRx++; _dbgUpdate();
+    _dbgRx++;
+    // Show first 6 bytes as hex for diagnosis
+    var hex = [];
+    for (var h = 0; h < Math.min(data.length, 6); h++) hex.push(data[h].toString(16));
+    _dbgLast = 'L' + data.length + ':' + hex.join(',');
+    _dbgUpdate();
     // Process each byte — handles both complete and fragmented SysEx
     for (var i = 0; i < data.length; i++) {
       var b = data[i];
