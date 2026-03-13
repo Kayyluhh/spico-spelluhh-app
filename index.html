@@ -466,6 +466,7 @@ body{background:#bb3321;color:#fff;font-family:'Nunito',sans-serif;font-size:14p
   var seqBankDisplay = 0;
   var armedStep = -1;
   var seqModeIdx = 0;
+  var seqWriteGuard = 0; // timestamp — ignore state dump step data until expired
 
   function $(id){ return document.getElementById(id); }
 
@@ -758,6 +759,7 @@ body{background:#bb3321;color:#fff;font-family:'Nunito',sans-serif;font-size:14p
   }
   function sendSeqStep(bank, step, val) {
     if (!transport) return;
+    seqWriteGuard = Date.now() + 250; // ignore stale state dumps for 250ms
     var msgs = [
       [0xB0, 23, (bank * 32) & 0x7F],
       [0xB0, 24, step & 0x7F],
@@ -1070,7 +1072,10 @@ body{background:#bb3321;color:#fff;font-family:'Nunito',sans-serif;font-size:14p
     knobs.depth.setValue(s.lfo.depth);
 
     seqLen = s.seq.len || 16; seqBankDisplay = s.seq.bank;
-    for (var i = 0; i < 16 && i < s.seq.steps.length; i++) stepNotes[i] = s.seq.steps[i];
+    // Skip step data overwrite while write guard is active (prevents stale echo)
+    if (Date.now() >= seqWriteGuard) {
+      for (var i = 0; i < 16 && i < s.seq.steps.length; i++) stepNotes[i] = s.seq.steps[i];
+    }
     $('v-seq-bank').value = s.seq.bank;
     knobs.bpm.setValue(Math.round((s.seq.bpm - 60) / 180 * 127));
     seqModeIdx = s.seq.mode || 0;
