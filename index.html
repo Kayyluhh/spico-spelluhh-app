@@ -94,7 +94,10 @@ body{background:#bb3321;color:#fff;font-family:'Nunito',sans-serif;font-size:14p
 .seq-hint{font-size:0.72em;color:#1a1a1a;margin:4px 0 6px;text-align:center;line-height:1.4}
 .seq-hint.armed-msg{color:#bb3321;font-weight:700}
 .seq-info{font-size:0.75em;color:#1a1a1a;display:flex;justify-content:space-between;
-  font-weight:700}
+  font-weight:700;align-items:center}
+.bank-sel{font-family:inherit;font-size:1em;font-weight:800;color:#1a1a1a;
+  background:#e8b820;border:2px solid #1a1a1a;border-radius:4px;padding:2px 4px;
+  cursor:pointer;-webkit-appearance:none;appearance:none}
 
 /* Keyboard */
 .kb-panel{background:#e8b820;border:3px solid #c45a08;box-shadow:0 0 0 3px #4a8bc4;
@@ -363,7 +366,7 @@ body{background:#bb3321;color:#fff;font-family:'Nunito',sans-serif;font-size:14p
     <div class="seq-steps" id="seq-steps"></div>
     <div id="seq-hint" class="seq-hint">Tap a step to arm it, then tap a key to assign. Tap armed step again to cancel.</div>
     <div class="seq-info">
-      <span>Bank <span id="v-seq-bank">A</span></span>
+      <select id="v-seq-bank" class="bank-sel"><option value="0">Bank A</option><option value="1">Bank B</option><option value="2">Bank C</option><option value="3">Bank D</option></select>
       <span id="v-seq-play-state">&#9632; Stopped</span>
     </div>
   </div>
@@ -739,9 +742,20 @@ body{background:#bb3321;color:#fff;font-family:'Nunito',sans-serif;font-size:14p
   }
   function sendSeqStep(bank, step, val) {
     if (!transport) return;
-    transport.send(new Uint8Array([0xB0, 23, (bank * 32) & 0x7F]));
-    transport.send(new Uint8Array([0xB0, 24, step & 0x7F]));
-    transport.send(new Uint8Array([0xB0, 25, val & 0x7F]));
+    if (transport.type === 'ble') {
+      // BLE needs delay between writes to avoid dropped packets
+      transport.send(new Uint8Array([0xB0, 23, (bank * 32) & 0x7F]));
+      setTimeout(function() {
+        transport.send(new Uint8Array([0xB0, 24, step & 0x7F]));
+        setTimeout(function() {
+          transport.send(new Uint8Array([0xB0, 25, val & 0x7F]));
+        }, 30);
+      }, 30);
+    } else {
+      transport.send(new Uint8Array([0xB0, 23, (bank * 32) & 0x7F]));
+      transport.send(new Uint8Array([0xB0, 24, step & 0x7F]));
+      transport.send(new Uint8Array([0xB0, 25, val & 0x7F]));
+    }
   }
   function sendSysex(bytes) {
     if (!transport) return;
@@ -755,10 +769,12 @@ body{background:#bb3321;color:#fff;font-family:'Nunito',sans-serif;font-size:14p
   // ---- USB MIDI (WebMIDI) transport ----
   function handleUsbMidiMessage(event) {
     var data = event.data;
-    if (data.length < 2) return;
+    if (!data || data.length < 2) return;
+    console.log('[USB-RX] len=' + data.length + ' first=' + data[0].toString(16) + ' last=' + data[data.length-1].toString(16));
     if (data[0] === 0xF0) {
       var inner = [];
       for (var i = 1; i < data.length - 1; i++) inner.push(data[i]);
+      console.log('[USB-RX] SysEx inner len=' + inner.length + (inner.length >= 5 ? ' d3=0x' + inner[3].toString(16) + ' d4=0x' + inner[4].toString(16) : ''));
       if (inner.length >= 5) decodeSysexState(inner);
     }
   }
@@ -879,6 +895,15 @@ body{background:#bb3321;color:#fff;font-family:'Nunito',sans-serif;font-size:14p
   seqPlayBtn.addEventListener('touchend',   function(){ seqPlayBtn.classList.remove('pressing'); }, {passive:true});
   seqPlayBtn.addEventListener('click', function(){
     sendCC(19, seqPlayBtn.classList.contains('active') ? 0 : 127);
+  });
+
+  // ---- Bank selector ----
+  $('v-seq-bank').addEventListener('change', function() {
+    var bank = parseInt(this.value);
+    seqBankDisplay = bank;
+    sendCC(23, (bank * 32) & 0x7F);  // CC23 = edit bank
+    sendCC(26, (bank * 32) & 0x7F);  // CC26 = active bank
+    requestState();
   });
 
   var SEQ_MODE_VALS = [0, 42, 85];
@@ -1028,7 +1053,7 @@ body{background:#bb3321;color:#fff;font-family:'Nunito',sans-serif;font-size:14p
 
     seqLen = s.seq.len || 16; seqBankDisplay = s.seq.bank;
     for (var i = 0; i < 16 && i < s.seq.steps.length; i++) stepNotes[i] = s.seq.steps[i];
-    $('v-seq-bank').textContent = String.fromCharCode(65 + s.seq.bank);
+    $('v-seq-bank').value = s.seq.bank;
     knobs.bpm.setValue(Math.round((s.seq.bpm - 60) / 180 * 127));
     seqModeIdx = s.seq.mode || 0;
     $('btn-seq-mode').textContent = MODES[seqModeIdx] || '?';
