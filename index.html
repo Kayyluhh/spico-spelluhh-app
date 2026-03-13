@@ -821,6 +821,11 @@ body{background:#bb3321;color:#fff;font-family:'Nunito',sans-serif;font-size:14p
     $('conn-label').textContent = 'Requesting MIDI\u2026';
     navigator.requestMIDIAccess({sysex: true}).then(function(access) {
       midiAccess = access;
+      // Check if SysEx permission was actually granted
+      if (!access.sysexEnabled) {
+        $('conn-label').textContent = 'SysEx denied — reset MIDI permission in browser settings';
+        return;
+      }
       var outputs = Array.from(access.outputs.values());
       var inputs  = Array.from(access.inputs.values());
       var out = outputs.find(function(o){ return o.name && o.name.indexOf('Spico') >= 0; }) || outputs[0];
