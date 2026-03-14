@@ -85,14 +85,27 @@ body{background:#bb3321;color:#fff;font-family:'Nunito',sans-serif;font-size:14p
 .seq-steps{display:flex;gap:3px;margin:6px 0}
 .st{flex:1;height:42px;background:#3a7aaa;border:1px solid #2a6a95;border-radius:3px;
   font-size:0.65em;display:flex;align-items:center;justify-content:center;
-  color:#1a1a1a;cursor:pointer;font-weight:700;
+  color:#1a1a1a;cursor:pointer;font-weight:700;position:relative;overflow:hidden;
   -webkit-tap-highlight-color:transparent}
+.st.has-pitch::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;background:var(--ptc,#888);border-radius:0}
+.st.has-glitch::before{content:'G';position:absolute;top:1px;right:2px;font-size:0.6em;color:#ff88cc;line-height:1;font-weight:900;opacity:0.9}
 .st.has{background:#eba02f;border-color:#c07a10;color:#1a1a1a}
 .st.cursor{background:#1a1a1a;border-color:#eba02f;border-width:2px;color:#eba02f}
 .st.active{background:#00cc66;border-color:#007a3a;color:#fff;box-shadow:0 0 4px #00cc6644}
 .st.armed{border-color:#bb3321;box-shadow:0 0 6px #bb332166;background:#fff;color:#bb3321}
 .seq-hint{font-size:0.72em;color:#1a1a1a;margin:4px 0 6px;text-align:center;line-height:1.4}
 .seq-hint.armed-msg{color:#bb3321;font-weight:700}
+.seq-write-bar{display:flex;gap:6px;align-items:center;margin:4px 0}
+.seq-write-bar select{font-family:inherit;font-size:0.8em;font-weight:700;background:#eba02f;border:none;color:#1a1a1a;padding:6px 8px;border-radius:4px;cursor:pointer}
+.seq-write-bar button{font-size:0.8em;font-weight:700;background:#3a7aaa;border:none;color:#fff;padding:6px 10px;border-radius:4px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.seq-write-bar button:active{background:#2a5a8a}
+.seq-write-bar button:disabled{opacity:0.4;cursor:default}
+.seq-lanes{margin:4px 0 2px;display:flex;flex-direction:column;gap:2px}
+.seq-lane{display:flex;gap:2px;height:6px}
+.seq-lane>div{flex:1;border-radius:1px;background:#2a4a6a}
+.seq-lane-pitch>div.has{background:var(--ptc,#888)}
+.seq-lane-glitch>div.has{background:#ff88cc}
+.seq-step-info{font-size:0.72em;color:#f5c8b8;text-align:center;margin:0 0 4px;min-height:1.1em;font-weight:700}
 .seq-info{font-size:0.75em;color:#1a1a1a;display:flex;justify-content:space-between;
   font-weight:700;align-items:center}
 .bank-sel{font-family:inherit;font-size:1em;font-weight:800;color:#1a1a1a;
@@ -364,7 +377,28 @@ body{background:#bb3321;color:#fff;font-family:'Nunito',sans-serif;font-size:14p
       <button class="seq-mode-btn" id="btn-seq-mode">Fwd</button>
     </div>
     <div class="seq-steps" id="seq-steps"></div>
-    <div id="seq-hint" class="seq-hint">Tap a step to arm it, then tap a key to assign. Tap armed step again to cancel.</div>
+    <div id="seq-hint" class="seq-hint">Tap a step to arm it (glows white), then open Keyboard and tap a key to assign a note.</div>
+    <div class="seq-write-bar">
+      <select id="seq-write-mode">
+        <option value="key">Key</option>
+        <option value="all">Key+P</option>
+        <option value="pitch">Pitch</option>
+        <option value="glitch">Glitch</option>
+      </select>
+      <button id="btn-write-pitch">+P</button>
+      <button id="btn-clear-pitch">&minus;P</button>
+      <button id="btn-write-glitch">+G</button>
+      <button id="btn-clear-glitch">&minus;G</button>
+      <button id="btn-copy-step" title="Copy step data">&#128203;</button>
+      <button id="btn-paste-step" title="Paste step data" disabled>&#128204;</button>
+      <button id="btn-lanes-toggle" title="Toggle mini lane view">&#9776;</button>
+    </div>
+    <div id="seq-lanes" class="seq-lanes" style="display:none">
+      <div class="seq-lane" id="lane-keys"></div>
+      <div class="seq-lane seq-lane-pitch" id="lane-pitch"></div>
+      <div class="seq-lane seq-lane-glitch" id="lane-glitch"></div>
+    </div>
+    <div id="seq-step-info" class="seq-step-info"></div>
     <div class="seq-info">
       <select id="v-seq-bank" class="bank-sel"><option value="0">Bank A</option><option value="1">Bank B</option><option value="2">Bank C</option><option value="3">Bank D</option></select>
       <span id="v-seq-play-state">&#9632; Stopped</span>
@@ -461,10 +495,14 @@ body{background:#bb3321;color:#fff;font-family:'Nunito',sans-serif;font-size:14p
 
   var userDriving = {};
   var connected = false;
-  var stepNotes = new Array(16).fill(0);
+  var stepNotes      = new Array(16).fill(0);
+  var stepPitchCC    = new Array(16).fill(0xFF);  // 0xFF = no lock (knob live)
+  var stepGlitchMask = new Array(16).fill(0xFF);  // 0xFF = no lock (glitch unchanged)
+  var lastGlitchMask = 0;  // Current cart_glitch_mask from firmware state
   var seqLen = 16;
   var seqBankDisplay = 0;
-  var armedStep = -1;
+  var armedStep  = -1;
+  var cursorStep = -1;
   var seqModeIdx = 0;
   var seqWriteGuard = 0; // timestamp — ignore state dump step data until expired
 
@@ -757,7 +795,8 @@ body{background:#bb3321;color:#fff;font-family:'Nunito',sans-serif;font-size:14p
     if (!transport) return;
     transport.send(new Uint8Array([vel > 0 ? 0x90 : 0x80, note & 0x7F, vel & 0x7F]));
   }
-  function sendSeqStep(bank, step, val) {
+  function sendSeqStep(bank, step, val, pitch) {
+    // val: key note (CC25); pitch: optional CC34 pitch lock (0-127, or undefined = skip)
     if (!transport) return;
     seqWriteGuard = Date.now() + 250; // ignore stale state dumps for 250ms
     var msgs = [
@@ -765,12 +804,53 @@ body{background:#bb3321;color:#fff;font-family:'Nunito',sans-serif;font-size:14p
       [0xB0, 24, step & 0x7F],
       [0xB0, 25, val & 0x7F]
     ];
+    if (pitch !== undefined && pitch >= 0 && pitch <= 127) {
+      msgs.push([0xB0, 34, pitch & 0x7F]);
+    }
     if (transport.type === 'ble' && transport.sendMulti) {
-      // Atomic BLE packet — all 3 CCs arrive in one write, no race condition
+      // Atomic BLE packet — all CCs arrive in one write, no race condition
       transport.sendMulti(msgs);
     } else {
       for (var i = 0; i < msgs.length; i++) transport.send(new Uint8Array(msgs[i]));
     }
+  }
+  function sendSeqPitch(bank, step, pitch) {
+    // Write pitch lock only (CC23 bank + CC24 cursor + CC34 pitch). No key write.
+    if (!transport) return;
+    seqWriteGuard = Date.now() + 250;
+    var msgs = [
+      [0xB0, 23, (bank * 32) & 0x7F],
+      [0xB0, 24, step & 0x7F],
+      [0xB0, 34, pitch & 0x7F]
+    ];
+    if (transport.type === 'ble' && transport.sendMulti) {
+      transport.sendMulti(msgs);
+    } else {
+      for (var i = 0; i < msgs.length; i++) transport.send(new Uint8Array(msgs[i]));
+    }
+  }
+  function sendSeqClearPitch(bank, step) {
+    // Clear pitch lock: set pitch_cc to 127, which web app treats as "no lock" (same as 0xFF&0x7F)
+    sendSeqPitch(bank, step, 127);
+  }
+  function sendSeqGlitch(bank, step, glitch) {
+    // Write glitch lock only (CC23 bank + CC24 cursor + CC35 glitch mask).
+    if (!transport) return;
+    seqWriteGuard = Date.now() + 250;
+    var msgs = [
+      [0xB0, 23, (bank * 32) & 0x7F],
+      [0xB0, 24, step & 0x7F],
+      [0xB0, 35, glitch & 0x7F]
+    ];
+    if (transport.type === 'ble' && transport.sendMulti) {
+      transport.sendMulti(msgs);
+    } else {
+      for (var i = 0; i < msgs.length; i++) transport.send(new Uint8Array(msgs[i]));
+    }
+  }
+  function sendSeqClearGlitch(bank, step) {
+    // Clear glitch lock: 0x7F sentinel = no override
+    sendSeqGlitch(bank, step, 127);
   }
   function sendSysex(bytes) {
     if (!transport) return;
@@ -943,7 +1023,14 @@ body{background:#bb3321;color:#fff;font-family:'Nunito',sans-serif;font-size:14p
   // ---- Sequencer step arm/assign ----
   function updateSeqHint() {
     var h = $('seq-hint');
-    if (armedStep >= 0) {
+    var mode = getWriteMode();
+    if (mode === 'pitch') {
+      h.textContent = 'Pitch Only: tap any step to stamp the current Pitch knob value onto it.';
+      h.className = 'seq-hint';
+    } else if (mode === 'glitch') {
+      h.textContent = 'Glitch Only: tap any step to stamp the current glitch state onto it.';
+      h.className = 'seq-hint';
+    } else if (armedStep >= 0) {
       h.textContent = 'Step '+(armedStep+1)+' armed \u2014 open Keyboard and tap a key. Tap step again to cancel.';
       h.className = 'seq-hint armed-msg';
     } else {
@@ -951,9 +1038,156 @@ body{background:#bb3321;color:#fff;font-family:'Nunito',sans-serif;font-size:14p
       h.className = 'seq-hint';
     }
   }
+  // ---- Write mode selector ----
+  var WRITE_MODE_CC36 = { key: 32, all: 0, pitch: 64, glitch: 96 };
+  $('seq-write-mode').addEventListener('change', function() {
+    if (this.value !== 'pitch' && this.value !== 'glitch') { /* keep armedStep */ }
+    // CC 36: report write mode selection to firmware (for OLED display hint)
+    sendCC(36, WRITE_MODE_CC36[this.value] !== undefined ? WRITE_MODE_CC36[this.value] : 32);
+    updateSeqHint();
+  });
+
+  // ---- Write Pitch / Clear Pitch buttons ----
+  $('btn-write-pitch').addEventListener('click', function() {
+    var step = armedStep >= 0 ? armedStep : cursorStep;
+    if (step < 0 || step >= 16) return;
+    var pitchVal = knobs.pitch ? knobs.pitch.getValue() : 63;
+    stepPitchCC[step] = pitchVal;
+    sendSeqPitch(seqBankDisplay, step, pitchVal);
+    renderSteps(-1);
+  });
+  $('btn-clear-pitch').addEventListener('click', function() {
+    var step = armedStep >= 0 ? armedStep : cursorStep;
+    if (step < 0 || step >= 16) return;
+    stepPitchCC[step] = 0xFF;
+    sendSeqClearPitch(seqBankDisplay, step);
+    renderSteps(-1);
+  });
+  $('btn-write-glitch').addEventListener('click', function() {
+    var step = armedStep >= 0 ? armedStep : cursorStep;
+    if (step < 0 || step >= 16) return;
+    // Current glitch state: sr_state bits 0-5 (loop/hold/glt1-4) + cart bits 0-5 (glt5-8/fb/sk)
+    // We encode cart as bits 2-5 in our 6-bit mask to match the firmware's cart_glitch_mask layout
+    var mask = lastGlitchMask & 0x3F;
+    stepGlitchMask[step] = mask;
+    sendSeqGlitch(seqBankDisplay, step, mask);
+    renderSteps(-1);
+  });
+  $('btn-clear-glitch').addEventListener('click', function() {
+    var step = armedStep >= 0 ? armedStep : cursorStep;
+    if (step < 0 || step >= 16) return;
+    stepGlitchMask[step] = 0xFF;
+    sendSeqClearGlitch(seqBankDisplay, step);
+    renderSteps(-1);
+  });
+
+  // ---- Step copy / paste ----
+  var stepClipboard = null;  // {key, pitch, glitch} or null
+  $('btn-copy-step').addEventListener('click', function() {
+    var step = armedStep >= 0 ? armedStep : cursorStep;
+    if (step < 0 || step >= 16) return;
+    stepClipboard = { key: stepNotes[step], pitch: stepPitchCC[step], glitch: stepGlitchMask[step] };
+    $('btn-paste-step').disabled = false;
+    $('btn-paste-step').title = 'Paste: ' + (stepClipboard.key > 0 ? stepLabel(stepClipboard.key) : 'rest');
+  });
+  $('btn-paste-step').addEventListener('click', function() {
+    if (!stepClipboard) return;
+    var step = armedStep >= 0 ? armedStep : cursorStep;
+    if (step < 0 || step >= 16) return;
+    stepNotes[step]      = stepClipboard.key;
+    stepPitchCC[step]    = stepClipboard.pitch;
+    stepGlitchMask[step] = stepClipboard.glitch;
+    // Send all three lanes atomically
+    seqWriteGuard = Date.now() + 250;
+    var msgs = [
+      [0xB0, 23, (seqBankDisplay * 32) & 0x7F],
+      [0xB0, 24, step & 0x7F],
+      [0xB0, 25, stepClipboard.key & 0x7F],
+    ];
+    if (stepClipboard.pitch !== 0xFF)    msgs.push([0xB0, 34, stepClipboard.pitch & 0x7F]);
+    if (stepClipboard.glitch !== 0xFF)   msgs.push([0xB0, 35, stepClipboard.glitch & 0x7F]);
+    if (transport) {
+      if (transport.type === 'ble' && transport.sendMulti) transport.sendMulti(msgs);
+      else for (var i = 0; i < msgs.length; i++) transport.send(new Uint8Array(msgs[i]));
+    }
+    renderSteps(-1);
+  });
+
+  // ---- Mini lane view ----
+  var lanesVisible = false;
+  function buildLaneCells() {
+    var laneKeys   = $('lane-keys');
+    var lanePitch  = $('lane-pitch');
+    var laneGlitch = $('lane-glitch');
+    if (!laneKeys) return;
+    laneKeys.innerHTML = lanePitch.innerHTML = laneGlitch.innerHTML = '';
+    for (var i = 0; i < 16; i++) {
+      var dk = document.createElement('div'); laneKeys.appendChild(dk);
+      var dp = document.createElement('div'); lanePitch.appendChild(dp);
+      var dg = document.createElement('div'); laneGlitch.appendChild(dg);
+    }
+  }
+  function updateLanes() {
+    var laneKeys   = $('lane-keys');
+    var lanePitch  = $('lane-pitch');
+    var laneGlitch = $('lane-glitch');
+    if (!laneKeys || !lanesVisible) return;
+    var kc = laneKeys.children;
+    var pc = lanePitch.children;
+    var gc = laneGlitch.children;
+    for (var i = 0; i < 16 && i < kc.length; i++) {
+      var has = stepNotes[i] > 0;
+      kc[i].style.background = has ? '#eba02f' : '#2a4a6a';
+      kc[i].style.opacity = i < seqLen ? '1' : '0.3';
+      var pit = stepPitchCC[i];
+      var hasPit = pit !== undefined && pit !== 0xFF && pit < 127;
+      if (hasPit) {
+        var hue = Math.round(220 - (pit / 126) * 220);
+        pc[i].style.background = 'hsl('+hue+',85%,55%)';
+        pc[i].classList.add('has');
+      } else {
+        pc[i].style.background = '#2a4a6a';
+        pc[i].classList.remove('has');
+      }
+      pc[i].style.setProperty('--ptc', hasPit ? 'hsl('+Math.round(220-(pit/126)*220)+',85%,55%)' : '');
+      var git = stepGlitchMask[i];
+      var hasGit = git !== undefined && git !== 0xFF && git < 127;
+      gc[i].style.background = hasGit ? '#ff88cc' : '#2a4a6a';
+      gc[i].classList.toggle('has', hasGit);
+    }
+  }
+  buildLaneCells();
+  $('btn-lanes-toggle').addEventListener('click', function() {
+    lanesVisible = !lanesVisible;
+    $('seq-lanes').style.display = lanesVisible ? '' : 'none';
+    this.style.background = lanesVisible ? '#eba02f' : '#3a7aaa';
+    this.style.color = lanesVisible ? '#1a1a1a' : '#fff';
+    if (lanesVisible) updateLanes();
+  });
+
+  function getWriteMode() { var s = $('seq-write-mode'); return s ? s.value : 'key'; }
   seqEl.addEventListener('click', function(e){
     var el = e.target; if (el.dataset.step === undefined) return;
     var step = parseInt(el.dataset.step);
+    var mode = getWriteMode();
+    if (mode === 'pitch') {
+      // Pitch-only mode: tap step → immediately write current pitch knob to that step
+      var pitchVal = knobs.pitch ? knobs.pitch.getValue() : 63;
+      stepPitchCC[step] = pitchVal;
+      sendSeqPitch(seqBankDisplay, step, pitchVal);
+      cursorStep = step;
+      renderSteps(-1); updateSeqHint();
+      return;
+    }
+    if (mode === 'glitch') {
+      // Glitch-only mode: tap step → stamp current glitch state onto that step
+      var glitchVal = lastGlitchMask & 0x3F;
+      stepGlitchMask[step] = glitchVal;
+      sendSeqGlitch(seqBankDisplay, step, glitchVal);
+      cursorStep = step;
+      renderSteps(-1); updateSeqHint();
+      return;
+    }
     if (armedStep === step) {
       armedStep = -1;  // Toggle off — disarm
     } else {
@@ -967,8 +1201,11 @@ body{background:#bb3321;color:#fff;font-family:'Nunito',sans-serif;font-size:14p
     if (e.target.dataset.note){
       var note = +e.target.dataset.note;
       if (armedStep >= 0) {
+        var mode = getWriteMode();
+        var pitch = (mode === 'all') ? knobs.pitch.getValue() : undefined;
         stepNotes[armedStep] = note;
-        sendSeqStep(seqBankDisplay, armedStep, note);
+        if (pitch !== undefined) stepPitchCC[armedStep] = pitch;
+        sendSeqStep(seqBankDisplay, armedStep, note, pitch);
         armedStep = -1; updateSeqHint(); renderSteps(-1);
         e.target.classList.add('pressed');
         setTimeout(function(){ e.target.classList.remove('pressed'); }, 150);
@@ -990,8 +1227,11 @@ body{background:#bb3321;color:#fff;font-family:'Nunito',sans-serif;font-size:14p
     if (el && el.dataset.note) {
       var note = +el.dataset.note;
       if (armedStep >= 0) {
+        var mode = getWriteMode();
+        var pitch = (mode === 'all') ? knobs.pitch.getValue() : undefined;
         stepNotes[armedStep] = note;
-        sendSeqStep(seqBankDisplay, armedStep, note);
+        if (pitch !== undefined) stepPitchCC[armedStep] = pitch;
+        sendSeqStep(seqBankDisplay, armedStep, note, pitch);
         armedStep = -1; updateSeqHint(); renderSteps(-1);
         el.classList.add('pressed');
         setTimeout(function(){ el.classList.remove('pressed'); }, 150);
@@ -1017,6 +1257,35 @@ body{background:#bb3321;color:#fff;font-family:'Nunito',sans-serif;font-size:14p
     if (hz >= 1000)    return (hz/1000).toFixed(1)+' kHz';
     return hz+' Hz';
   }
+  // Approximate CC1 pitch value → frequency (two-segment log curve matching firmware)
+  function pitchCcToHz(cc) {
+    if (cc >= 127) return 0; // sentinel: no lock
+    if (cc <= 63) {
+      // CC 0 → ~200 kHz, CC 63 → 641 kHz
+      var t = cc / 63;
+      return Math.round(200000 * Math.pow(3.205, t));
+    } else {
+      // CC 64 → ~641 kHz, CC 127 → ~1500 kHz
+      var t = (cc - 64) / 63;
+      return Math.round(641000 * Math.pow(2.340, t));
+    }
+  }
+  function updateStepInfo() {
+    var el = $('seq-step-info'); if (!el) return;
+    var s = armedStep >= 0 ? armedStep : cursorStep;
+    if (s < 0 || s >= 16) { el.textContent = ''; return; }
+    var key   = stepNotes[s];
+    var pitch = stepPitchCC[s];
+    var glit  = stepGlitchMask[s];
+    var keyStr   = key > 0 ? ('Key: ' + stepLabel(key)) : 'Key: rest';
+    var pitchStr = (pitch === 0xFF || pitch >= 127)
+      ? 'Pitch: Live'
+      : 'Pitch: CC' + pitch + ' \u2248 ' + fmtFreq(pitchCcToHz(pitch));
+    var glitStr  = (glit === 0xFF || glit >= 127)
+      ? 'Glitch: Live'
+      : 'Glitch: 0x' + (glit & 0x3F).toString(16).toUpperCase().padStart(2,'0');
+    el.textContent = 'Step ' + (s + 1) + '  \u2014  ' + keyStr + '  |  ' + pitchStr + '  |  ' + glitStr;
+  }
   function updateLfoSel(containerId, activeVal){
     var zone = Math.min(3, Math.floor(activeVal / 32));
     $(containerId).querySelectorAll('button').forEach(function(btn, i){
@@ -1032,17 +1301,33 @@ body{background:#bb3321;color:#fff;font-family:'Nunito',sans-serif;font-size:14p
     }
     return '?';
   }
-  function renderSteps(activeStep, cursorStep) {
+  function renderSteps(activeStep, newCursorStep) {
+    if (newCursorStep !== undefined) cursorStep = newCursorStep;
     for (var i = 0; i < 16; i++) {
       var el = $('st-'+i); if (!el) continue;
-      var has = stepNotes[i] > 0;
+      var has      = stepNotes[i] > 0;
+      var pitch    = stepPitchCC[i];
+      var glit     = stepGlitchMask[i];
+      var hasPitch  = (pitch !== undefined && pitch !== 0xFF && pitch < 127);
+      var hasGlitch = (glit  !== undefined && glit  !== 0xFF && glit  < 127);
       el.className = 'st' + (has ? ' has' : '') +
+                     (hasPitch  ? ' has-pitch'  : '') +
+                     (hasGlitch ? ' has-glitch' : '') +
                      (i === activeStep  ? ' active' : '') +
                      (i === cursorStep  ? ' cursor' : '') +
                      (i === armedStep   ? ' armed'  : '');
       el.textContent = has ? stepLabel(stepNotes[i]) : (i === armedStep ? '?' : '');
       el.style.display = (i < seqLen) ? '' : 'none';
+      if (hasPitch) {
+        // Color bar: blue (CC 0) → green (CC 63) → red (CC 127)
+        var hue = Math.round(220 - (pitch / 126) * 220);
+        el.style.setProperty('--ptc', 'hsl('+hue+',85%,55%)');
+      } else {
+        el.style.removeProperty('--ptc');
+      }
     }
+    updateStepInfo();
+    if (lanesVisible) updateLanes();
   }
 
   // ---- State handler ----
@@ -1067,6 +1352,7 @@ body{background:#bb3321;color:#fff;font-family:'Nunito',sans-serif;font-size:14p
     glitch('g-5', s.cart&1);  glitch('g-6', s.cart&2);
     glitch('g-7', s.cart&4);  glitch('g-8', s.cart&8);
     glitch('g-fb', s.cart&16); glitch('g-sk', s.cart&32);
+    lastGlitchMask = s.cart & 0x3F;
 
     updateLfoSel('lfo-wave',   s.lfo.wave);
     updateLfoSel('lfo-target', s.lfo.target);
@@ -1077,6 +1363,12 @@ body{background:#bb3321;color:#fff;font-family:'Nunito',sans-serif;font-size:14p
     // Skip step data overwrite while write guard is active (prevents stale echo)
     if (Date.now() >= seqWriteGuard) {
       for (var i = 0; i < 16 && i < s.seq.steps.length; i++) stepNotes[i] = s.seq.steps[i];
+      if (s.seq.pitch) {
+        for (var i = 0; i < 16 && i < s.seq.pitch.length; i++) stepPitchCC[i] = s.seq.pitch[i];
+      }
+      if (s.seq.glitch) {
+        for (var i = 0; i < 16 && i < s.seq.glitch.length; i++) stepGlitchMask[i] = s.seq.glitch[i];
+      }
     }
     $('v-seq-bank').value = s.seq.bank;
     knobs.bpm.setValue(Math.round((s.seq.bpm - 60) / 180 * 127));
@@ -1118,7 +1410,27 @@ body{background:#bb3321;color:#fff;font-family:'Nunito',sans-serif;font-size:14p
   function decodeSysexState(d) {
     if (d.length < 47 || d[3] !== 0x53 || d[4] !== 0x44) return;
     var p = d.slice(5);
+    // Bytes 26-41: step keys (v1 + v2)
     var steps = []; for (var i = 0; i < 16; i++) steps.push(p[26+i]);
+    // Bytes 42-57: step pitch_cc (v2+ — packet length >= 58 after p = d.slice(5))
+    // 0x7F in packet = firmware sentinel 0xFF masked to 7 bits = "no lock"
+    var pitch = null;
+    if (p.length >= 58) {
+      pitch = [];
+      for (var i = 0; i < 16; i++) {
+        var pc = p[42+i];
+        pitch.push(pc >= 127 ? 0xFF : pc);  // normalize 0x7F sentinel → 0xFF
+      }
+    }
+    // Bytes 58-73: step glitch_mask (v3 — packet length >= 74)
+    var glit = null;
+    if (p.length >= 74) {
+      glit = [];
+      for (var i = 0; i < 16; i++) {
+        var gm = p[58+i];
+        glit.push(gm >= 127 ? 0xFF : gm);  // normalize 0x7F sentinel → 0xFF
+      }
+    }
     handleState({
       freq_hz:(p[0]<<14)|(p[1]<<7)|p[2], period:(p[3]<<7)|p[4],
       batt_mv:(p[5]<<7)|p[6],
@@ -1126,7 +1438,7 @@ body{background:#bb3321;color:#fff;font-family:'Nunito',sans-serif;font-size:14p
       midi_ch:p[8]+1, pitch_cc:p[9], starve:(p[10]<<7)|p[11], sr:p[12], cart:p[13],
       lfo:{wave:p[14], target:p[15], rate:p[16], depth:p[17]},
       seq:{play:!!p[18], step:p[19], bank:p[20], bpm:((p[21]<<7)|p[22])+60,
-           len:p[23], mode:p[24], cursor:p[25], steps:steps}
+           len:p[23], mode:p[24], cursor:p[25], steps:steps, pitch:pitch, glitch:glit}
     });
   }
 
